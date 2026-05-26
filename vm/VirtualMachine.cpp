@@ -1,6 +1,10 @@
 #include "VirtualMachine.h"
 using namespace lua;
 
+lua::VirtualMachine::VirtualMachine()
+{
+}
+
 void lua::VirtualMachine::Run(Prototype& p)
 {
     auto& c = NewLuaClosure(p);
@@ -17,6 +21,11 @@ void lua::VirtualMachine::Run(Prototype& p)
 Closure& lua::VirtualMachine::NewLuaClosure(Prototype& p)
 {
     return _closureStorage.emplace_back(&p);
+}
+
+Table& lua::VirtualMachine::NewLuaTable(size_t nArr, size_t nRec)
+{
+    return _tableStorage.emplace_back(nArr, nRec);
 }
 
 void lua::VirtualMachine::Call(int64_t nArgs, int64_t nResults)

@@ -47,10 +47,6 @@ public:
     std::array<slot_type, NP> GetPara() const;
     void SetPara(std::array<slot_type, NP> p);
 
-    static int64_t ToInt(const std::string& str);
-    static int64_t ToHex(const std::string& str);
-    static double ToFloat(const std::string& str);
-    static double ToHexFloat(const std::string& str);
     std::pair<slot_type, uint8_t> ExpToOpArg(LuaParser::ExpContext* node, uint8_t argKinds);
     std::pair<slot_type, slot_type> ExpToOpArg(const std::vector<LuaParser::ExpContext*>& nodes, uint8_t argKinds);
     std::pair<slot_type, uint8_t> NameToOpArg(const std::string& name, uint8_t argKinds);

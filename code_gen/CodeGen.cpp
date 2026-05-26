@@ -1,7 +1,8 @@
 #include "CodeGen.h"
-#include <charconv>
+#include "aux.h"
 
 using namespace lua;
+using namespace lua::aux;
 
 std::string lua::CodeGen::Unescape(std::string_view src)
 {
@@ -161,38 +162,6 @@ void lua::CodeGen::SetPara(std::array<slot_type, NP> p)
 {
     _a = p[0];
     _n = p[1];
-}
-
-int64_t lua::CodeGen::ToInt(const std::string& str)
-{
-    auto cs = str.c_str();
-    int64_t val;
-    std::from_chars(cs, cs + str.size(), val);
-    return val;
-}
-
-int64_t lua::CodeGen::ToHex(const std::string& str)
-{
-    auto cs = str.c_str();
-    int64_t val;
-    std::from_chars(cs + 2, cs + str.size(), val, 16);
-    return val;
-}
-
-double lua::CodeGen::ToFloat(const std::string& str)
-{
-    auto cs = str.c_str();
-    double val;
-    std::from_chars(cs, cs + str.size(), val);
-    return val;
-}
-
-double lua::CodeGen::ToHexFloat(const std::string& str)
-{
-    auto cs = str.c_str();
-    double val;
-    std::from_chars(cs + 2, cs + str.size(), val, std::chars_format::hex);
-    return val;
 }
 
 std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* node, uint8_t argKinds)
@@ -365,7 +334,7 @@ slot_type lua::CodeGen::VisitMember(LuaParser::MemberContext* member)
 Prototype lua::CodeGen::Generate(LuaParser::ChunkContext* ck)
 {
     root = std::make_unique<FuncInfo>();
-    root->AddLocVar("_ENV", 0);
+    root->AddLocVar(str::ENV, 0);
     fi = root.get();
 
     visitChunk(ck);
@@ -399,6 +368,7 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
             subFi.AddLocVar(nn->getText(), 0);
         }
         subFi.isVararg = nplist->DDD();
+        subFi.numParams = names.size();
     }
 
     fi = &subFi;
@@ -686,11 +656,11 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
             }
             else
             {
-                slot_type g = fi->SlotOfLocVar("_ENV");
+                slot_type g = fi->SlotOfLocVar(str::ENV);
                 bool up = g < 0;
                 if (!up)
                 {
-                    g = fi->IndexOfUpval("_ENV");
+                    g = fi->IndexOfUpval(str::ENV);
                 }
                 auto c = kRegs[i] < 0 ? 0x100 + fi->IndexOfConstant(varName) : kRegs[i];
                 if (up)
@@ -1179,7 +1149,7 @@ void lua::CodeGen::VisitNAME(const std::string& text, slot_type a)
     else
     {
         auto oldRegs = fi->usedRegs;
-        auto [b, kindB] = NameToOpArg("_ENV", Arg::RU);
+        auto [b, kindB] = NameToOpArg(str::ENV, Arg::RU);
         auto c = ConstantToOpArg(text);
         fi->usedRegs = oldRegs;
         Arg::UPVAL == kindB ? fi->EmitGetTabUp(a, b, c) : fi->EmitGetTable(a, b, c);

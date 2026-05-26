@@ -27,4 +27,4 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/vm)
 
 add_executable(luac main.cpp ${LUA_BASE} ${GEN_SRC})
 
-target_link_libraries(luac parser code_gen lua_vm)
+target_link_libraries(luac parser lua_vm)

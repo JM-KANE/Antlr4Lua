@@ -4,13 +4,39 @@
 #include <vector>
 #include <memory>
 #include "type.h"
-#include "OpCodes.h"
+#include "OpCodesType.h"
 
 #include "LuaParser.h"
 
 namespace lua
 {
 using slot_type = int16_t;
+
+namespace str
+{
+constexpr char ENV[] = "_ENV";
+
+constexpr char INDEX[] = "__index";
+constexpr char CALL[] = "__call";
+constexpr char NEWINDEX[] = "__newindex";
+constexpr char ADD[] = "__add";
+constexpr char SUB[] = "__sub";
+constexpr char MUL[] = "__mul";
+constexpr char MOD[] = "__mod";
+constexpr char POW[] = "__pow";
+constexpr char DIV[] = "__div";
+constexpr char IDIV[] = "__idiv";
+constexpr char BAND[] = "__band";
+constexpr char BOR[] = "__bor";
+constexpr char BXOR[] = "__bxor";
+constexpr char SHL[] = "__shl";
+constexpr char SHR[] = "__shr";
+constexpr char UNM[] = "__unm";
+constexpr char BNOT[] = "__bnot";
+constexpr char LEN[] = "__len";
+constexpr char CONCAT[] = "__concat";
+
+}  // namespace str
 
 // TODO chunk and header
 
@@ -68,7 +94,7 @@ struct FuncInfo
     FuncInfo* parent{};
     std::vector<FuncInfo> subFuncs;
     slot_type usedRegs{};
-    slot_type maxRegs{255};
+    slot_type maxRegs{128};
     uint32_t scopeLv{};
     std::vector<LocVarInfo> locVars;
     string_ref_map<LocVarInfo*> locNames;

@@ -1,5 +1,5 @@
-#ifndef _OP_CODES_H
-#define _OP_CODES_H
+#ifndef _OP_CODES_TYPE_H
+#define _OP_CODES_TYPE_H
 
 #include <stdint.h>
 
@@ -61,6 +61,22 @@ enum class Op : uint32_t
     CLOSURE,
     VARARG,
     EXTRAARG
+};
+
+enum class Inst : uint8_t
+{
+    ABC,
+    ABx,
+    AsBx,
+    Ax
+};
+
+enum class OpArg : uint8_t
+{
+    N,
+    U,
+    R,
+    K
 };
 
 }  // namespace lua

@@ -1,65 +1,7 @@
 #ifndef _STRUCT_H
 #define _STRUCT_H
 
-#include "../code_gen/FuncInfo.h"
-
-namespace lua
-{
-
-namespace cv
-{
-constexpr auto MINSTACK = 20;
-constexpr auto MAXSTACK = 1'000'000'000;
-constexpr auto REGISTRYINDEX = -MAXSTACK - 1000;
-constexpr auto RIDX_MAINTHREAD = 1;
-constexpr auto RIDX_GLOBALS = 2;
-}  // namespace cv
-
-struct State;
-struct Table;
-using BaseValue =
-    std::variant<std::nullptr_t, bool, int64_t, double, std::string, struct Table*, struct Closure*, void*>;
-
-namespace type
-{
-constexpr uint8_t NIL = 0;
-constexpr uint8_t BOOLEAN = 1;
-constexpr uint8_t LIGHTUSERDATA = 2;
-constexpr uint8_t NUMBER = 3;
-constexpr uint8_t STRING = 4;
-constexpr uint8_t TABLE = 5;
-constexpr uint8_t FUNCTION = 6;
-constexpr uint8_t USERDATA = 7;
-constexpr uint8_t THREAD = 8;
-}  // namespace type
-
-struct Value : public BaseValue
-{
-    using BaseValue::BaseValue;
-
-    bool IsTable() const
-    {
-        return index() == 5;
-    }
-    bool IsClosure() const
-    {
-        return index() == 6;
-    }
-
-    uint8_t TypeOf() const;
-
-    Table* GetMetatable(State* ls);
-    Value* GetMetafield(const std::string& fieldName, State* ls);
-};
-}  // namespace lua
-namespace std
-{
-template <>
-struct hash<lua::Value> : hash<lua::BaseValue>
-{
-};
-
-}  // namespace std
+#include "Value.h"
 
 namespace lua
 {
@@ -77,23 +19,43 @@ struct Stack
     size_t top{};
     State* state{};
     Closure* closure{};
+    std::vector<Value> varargs;
+    std::unordered_map<size_t, Value*> openuvs;
+    size_t pc{};
     Stack* prev{};
 
     Stack(size_t size, State* st);
 
+    void Check(size_t n);
     template <typename T>
     auto& Push(T&& v)
     {
-        return slots.emplace_back(std::forward<T>(v));
+        if (top == slots.size())
+        {
+            // TODO error
+        }
+        slots[top] = std::forward<T>(v);
+        ++top;
+        return slots[top];
     }
-    size_t AbsIndex(int64_t idx);
-    Value Get(int64_t idx);
+    Value Pop();
+
+    void PushN(std::vector<Value>& vals, int64_t n, size_t start = 0);
+    std::vector<Value> PopN(int64_t n);
+    size_t AbsIndex(int64_t idx) const;
+    Value Get(int64_t idx) const;
+    void Set(int64_t idx, Value val);
+    void Reverse(size_t from, size_t to);
+
+    bool IsValid(int32_t idx) const;
 };
 
 struct Table
 {
 private:
     static int64_t KeyToInt(const Value& key);
+    void ShrinkArray();
+    void ExpandArray();
 
 public:
     Table* metatable{};
@@ -103,12 +65,15 @@ public:
     uint8_t changed{1};
 
     Table() = default;
-    Table(size_t nArr);
+    Table(size_t nArr, size_t nRec);
+
+    bool HasMetafield(const std::string& fieldName) const;
+    size_t Len() const;
 
     Value* Get(const Value& key);
 
     void Put(Value&& key, Value&& val);
-
+    const Value* NextKey(const Value& key);
     void InitKeys();
 };
 
