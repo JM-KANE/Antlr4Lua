@@ -9,7 +9,7 @@ namespace lua
 namespace cv
 {
 constexpr auto MINSTACK = 20;
-constexpr auto MAXSTACK = 1'000'000'000;
+constexpr auto MAXSTACK = 1'000'000;
 constexpr auto REGISTRYINDEX = -MAXSTACK - 1000;
 constexpr auto RIDX_MAINTHREAD = 1;
 constexpr auto RIDX_GLOBALS = 2;
@@ -61,14 +61,20 @@ struct Value : public BaseValue
         return index() == 4;
     }
 
+    static std::unique_ptr<Value> Nil();
+
     uint8_t TypeOf() const;
 
     Value ConvertToNumber() const;
+    std::pair<int64_t, bool> ConvertToInteger() const;
+    std::pair<double, bool> ConvertToFloat() const;
     bool ConvertToBoolean() const;
 
     Table* GetMetatable(State* ls) const;
     Value* GetMetafield(const std::string& fieldName, State* ls) const;
 };
+
+using ValuePtr = std::shared_ptr<Value>;
 }  // namespace lua
 namespace std
 {

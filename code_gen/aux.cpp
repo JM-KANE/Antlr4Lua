@@ -86,5 +86,11 @@ double ToHexFloat(const std::string& str, std::from_chars_result* res)
     return val;
 }
 
+std::pair<int64_t, bool> FloatToInteger(double f)
+{
+    auto i = int64_t(f);
+    return std::pair<int64_t, bool>(i, i == f);
+}
+
 }  // namespace aux
 }  // namespace lua

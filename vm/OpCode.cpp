@@ -137,6 +137,7 @@ void self(Instruction i, State* ls)
 
 namespace
 {
+// R(A) := RK(B) op RK(C)
 template <typename T>
 void BinaryArith(Instruction i, State* ls)
 {
@@ -147,6 +148,7 @@ void BinaryArith(Instruction i, State* ls)
     ls->Arith<T>();
     ls->Replace(a);
 }
+// R(A) := op R(B)
 template <typename T>
 void UnaryArith(Instruction i, State* ls)
 {
@@ -173,6 +175,7 @@ constexpr auto shr = BinaryArith<op::ShR>;
 constexpr auto unm = UnaryArith<op::UnM>;
 constexpr auto bnot = UnaryArith<op::BNot>;
 
+// R(A) := not R(B)
 void _not(Instruction i, State* ls)
 {
     auto [a, b, _] = i.ABC();
@@ -181,7 +184,7 @@ void _not(Instruction i, State* ls)
     ls->PushBoolean(!ls->ToBoolean(b));
     ls->Replace(a);
 }
-
+// R(A) := length of R(B)
 void length(Instruction i, State* ls)
 {
     auto [a, b, _] = i.ABC();
@@ -190,7 +193,7 @@ void length(Instruction i, State* ls)
     ls->Len(b);
     ls->Replace(a);
 }
-
+// R(A) := R(B).. ... ..R(C)
 void concat(Instruction i, State* ls)
 {
     auto [a, b, c] = i.ABC();
@@ -206,7 +209,7 @@ void concat(Instruction i, State* ls)
     ls->Concat(n);
     ls->Replace(a);
 }
-
+// pc+=sBx; if (A) close all upvalues >= R(A - 1)
 void jmp(Instruction i, State* ls)
 {
     auto [a, sBx] = i.AsBx();
@@ -217,65 +220,255 @@ void jmp(Instruction i, State* ls)
         ls->CloseUpvalues(a);
     }
 }
-
-void eq(Instruction i, State* ls)
+namespace
 {
+// if ((RK(B) op RK(C)) ~= A) then pc++
+template <typename T>
+void Compare(Instruction i, State* ls)
+{
+    auto [a, b, c] = i.ABC();
+    ls->GetRK(b);
+    ls->GetRK(c);
+    if (ls->Compare<T>(-2, -1) != bool(a))
+    {
+        ls->AddPC(1);
+    }
+    ls->Pop(2);
 }
 
-void lt(Instruction i, State* ls)
-{
-}
+}  // namespace
 
-void le(Instruction i, State* ls)
-{
-}
+constexpr auto eq = Compare<op::Eq>;
+constexpr auto lt = Compare<op::Lt>;
+constexpr auto le = Compare<op::Le>;
 
+// if not (R(A) <=> C) then pc++
 void test(Instruction i, State* ls)
 {
+    auto [a, _, c] = i.ABC();
+    ++a;
+    if (ls->ToBoolean(a) != bool(c))
+    {
+        ls->AddPC(1);
+    }
 }
 
 void testSet(Instruction i, State* ls)
 {
+    auto [a, b, c] = i.ABC();
+    ++a;
+    ++b;
+    if (ls->ToBoolean(b) != bool(c))
+    {
+        ls->AddPC(1);
+    }
+    else
+    {
+        ls->Copy(b, a);
+    }
 }
 
+namespace
+{
+void FixStack(int32_t a, State* ls)
+{
+    auto x = int32_t(ls->ToInteger(-1));
+    ls->Pop(1);
+    ls->CheckStack(x - a);
+    for (int32_t i = a; i < x; i++)
+    {
+        ls->PushValue(i);
+    }
+    ls->Rotate(ls->RegisterCount() + 1, x - a);
+}
+int32_t PushFuncAndArgs(int32_t a, int32_t b, State* ls)
+{
+    if (b >= 1)
+    {
+        ls->CheckStack(b);
+        for (auto i = a; i < a + b; i++)
+        {
+            ls->PushValue(i);
+        }
+        return b - 1;
+    }
+    else
+    {
+        FixStack(a, ls);
+        return ls->GetTop() - ls->RegisterCount() - 1;
+    }
+}
+void PopResults(int32_t a, int32_t c, State* ls)
+{
+    if (c > 1)
+    {
+        for (auto i = a + c - 2; i >= a; --i)
+        {
+            ls->Replace(a);
+        }
+    }
+    else if (c != 1)
+    {
+        ls->CheckStack(1);
+        ls->PushInteger(a);
+    }
+}
+
+}  // namespace
+
+// R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 void call(Instruction i, State* ls)
 {
+    auto [a, b, c] = i.ABC();
+    ++a;
+    auto nArgs = PushFuncAndArgs(a, b, ls);
+    ls->Call(nArgs, c - 1);
+    PopResults(a, c, ls);
 }
-
+// return R(A)(R(A+1), ... ,R(A+B-1))
 void tailCall(Instruction i, State* ls)
 {
-}
+    auto [a, b, _] = i.ABC();
+    ++a;
+    auto nArgs = PushFuncAndArgs(a, b, ls);
+    ls->Call(nArgs, -1);
+    PopResults(a, 0, ls);
 
+    // todo: optimize tail call!
+}
+// return R(A), ... ,R(A+B-2)
 void _return(Instruction i, State* ls)
 {
+    auto [a, b, _] = i.ABC();
+    ++a;
+    if (b > 1)
+    {
+        ls->CheckStack(b - 1);
+        for (auto i = a; i <= a + b - 2; ++i)
+        {
+            ls->PushValue(i);
+        }
+    }
+    else if (b != 1)
+    {
+        FixStack(a, ls);
+    }
 }
-
+// R(A)+=R(A+2);
+// if R(A) <?= R(A+1) then {
+//   pc+=sBx; R(A+3)=R(A)
+// }
 void forLoop(Instruction i, State* ls)
 {
-}
+    auto [a, sBx] = i.AsBx();
+    ++a;
+    ls->PushValue(a + 2);
+    ls->PushValue(a);
+    ls->Arith<op::Add>();
+    ls->Replace(a);
 
+    auto isPos = ls->ToFloat(a + 2) >= 0;
+    if (isPos && ls->Compare<op::Le>(a, a + 1) || !isPos && ls->Compare<op::Le>(a + 1, a))
+    {
+        ls->AddPC(sBx);
+        ls->Copy(a, a + 3);
+    }
+}
+// R(A)-=R(A+2); pc+=sBx
 void forPrep(Instruction i, State* ls)
 {
+    auto [a, sBx] = i.AsBx();
+    ++a;
+    for (int32_t i = 0; i < 3; i++)
+    {
+        ls->PushAny(ls->ToNumber(a + i));
+        ls->Replace(a + i);
+    }
+    ls->PushValue(a);
+    ls->PushValue(a + 2);
+    ls->Arith<op::Sub>();
+    ls->Replace(a);
+    ls->AddPC(sBx);
 }
-
+// R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2));
 void tForCall(Instruction i, State* ls)
 {
+    auto [a, _, c] = i.ABC();
+    ++a;
+    PushFuncAndArgs(a, 3, ls);
+    ls->Call(2, c);
+    PopResults(a + 3, c + 1, ls);
 }
-
+// if R(A+1) ~= nil then {
+//   R(A)=R(A+1); pc += sBx
+// }
 void tForLoop(Instruction i, State* ls)
 {
+    auto [a, sBx] = i.AsBx();
+    ++a;
+    if (!ls->IsNil(a + 1))
+    {
+        ls->Copy(a + 1, a);
+        ls->AddPC(sBx);
+    }
 }
-
+// R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
 void setList(Instruction i, State* ls)
 {
+    auto [a, b, c] = i.ABC();
+    ++a;
+    if (c > 0)
+    {
+        --c;
+    }
+    else
+    {
+        c = Instruction(ls->Fetch()).Ax();
+    }
+    auto isZero = 0 == b;
+    if (isZero)
+    {
+        b = int32_t(ls->ToInteger(-1)) - a - 1;
+        ls->Pop(1);
+    }
+
+    ls->CheckStack(1);
+    int64_t idx = c * cv::LFIELDS_PER_FLUSH;
+    for (auto j = 1; j <= b; j++)
+    {
+        ++idx;
+        ls->PushValue(a + j);
+        ls->SetI(a, idx);
+    }
+    if (isZero)
+    {
+        for (size_t j = ls->RegisterCount(); j < ls->GetTop(); j++)
+        {
+            ++idx;
+            ls->PushValue(j);
+            ls->SetI(a, idx);
+        }
+        ls->SetTop(ls->RegisterCount());
+    }
 }
 
 void closure(Instruction i, State* ls)
 {
+    auto [a, bx] = i.ABx();
+    ++a;
+    ls->LoadProto(bx);
+    ls->Replace(a);
 }
-
+// R(A), R(A+1), ..., R(A+B-2) = vararg
 void vararg(Instruction i, State* ls)
 {
+    auto [a, b, _] = i.ABC();
+    ++a;
+    if (1 != b)
+    {
+        ls->LoadVararg(b - 1);
+        PopResults(a, b, ls);
+    }
 }
 
 }  // namespace lua

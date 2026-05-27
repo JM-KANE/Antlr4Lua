@@ -35,6 +35,9 @@ constexpr char UNM[] = "__unm";
 constexpr char BNOT[] = "__bnot";
 constexpr char LEN[] = "__len";
 constexpr char CONCAT[] = "__concat";
+constexpr char EQ[] = "__eq";
+constexpr char LT[] = "__lt";
+constexpr char LE[] = "__le";
 
 }  // namespace str
 

@@ -1,4 +1,5 @@
 #include "Instruction.h"
+#include "OpCode.h"
 
 using namespace lua;
 
@@ -45,4 +46,6 @@ int32_t lua::Instruction::Ax() const
 
 void lua::Instruction::Execute(State* ls)
 {
+    auto action = OpCode::Get()[std::size_t(Opcode())].action;
+    action(*this, ls);
 }

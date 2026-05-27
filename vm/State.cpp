@@ -1,7 +1,8 @@
 #include "VirtualMachine.h"
 #include "Instruction.h"
-#include "State.h"
 #include <iomanip>
+#include "stdlib/stdlib.h"
+#include "State.h"
 using namespace lua;
 
 lua::State::State() : registry(8, 0)
@@ -10,6 +11,42 @@ lua::State::State() : registry(8, 0)
     globals.map.reserve(20);
     registry.Put(cv::RIDX_GLOBALS, &globals);
     PushLuaStack(cv::MINSTACK, this);
+}
+
+void lua::State::OpenLibs()
+{
+    constexpr FuncReg<8> A{
+        pair_type{"_G", stdlib::OpenBaseLib}, {"math", stdlib::OpenMathLib},           {"table", stdlib::OpenTableLib},
+        {"string", stdlib::OpenStringLib},    {"utf8", stdlib::OpenUTF8Lib},           {"os", stdlib::OpenOSLib},
+        {"package", stdlib::OpenPackageLib},  {"coroutine", stdlib::OpenCoroutineLib},
+    };
+
+    for (auto&& [name, f] : A)
+    {
+        RequireF(name, f, true);
+        Pop(1);
+    }
+}
+
+void lua::State::RequireF(const char* modname, Function openf, bool glb)
+{
+    GetSubTable(cv::REGISTRYINDEX, "_LOADED");
+    GetField(-1, modname);
+    if (!ToBoolean(-1))
+    {
+        Pop(1);
+        PushFunction(openf);
+        PushString(modname);
+        Call(1, 1);
+        PushValue(-1);
+        SetField(-3, modname);
+    }
+    Remove(-2);
+    if (glb)
+    {
+        PushValue(-1);
+        SetGlobal(modname);
+    }
 }
 
 void lua::State::Rotate(int64_t idx, int64_t n)
@@ -25,6 +62,23 @@ void lua::State::Rotate(int64_t idx, int64_t n)
 void lua::State::Insert(int64_t idx)
 {
     Rotate(idx, 1);
+}
+
+void lua::State::PushFunction(Function f)
+{
+    auto& c = vm->NewFuncClosure(f, 0);
+    stack().Push(&c);
+}
+
+void lua::State::PushFuncClosure(Function f, int32_t n)
+{
+    auto& closure = vm->NewFuncClosure(f, n);
+    for (auto i = n; i > 0; i--)
+    {
+        auto val = stack().Pop();
+        closure.upvals[i - 1] = std::make_shared<Upvalue>(std::move(val));
+    }
+    stack().Push(&closure);
 }
 
 Stack& lua::State::PushLuaStack(size_t size, State* st)
@@ -60,6 +114,26 @@ void lua::State::PushBoolean(bool b)
     stack().Push(b);
 }
 
+void lua::State::PushInteger(int64_t n)
+{
+    stack().Push(n);
+}
+
+void lua::State::PushNumber(double f)
+{
+    stack().Push(f);
+}
+
+void lua::State::PushString(std::string s)
+{
+    stack().Push(std::move(s));
+}
+
+void lua::State::PushAny(Value v)
+{
+    stack().Push(std::move(v));
+}
+
 void lua::State::PushValue(int32_t idx)
 {
     stack().Push(stack().Get(idx));
@@ -71,6 +145,12 @@ void lua::State::Pop(size_t n)
     {
         stack().Pop();
     }
+}
+
+void lua::State::PushGlobalTable()
+{
+    auto g = registry.Get(cv::RIDX_GLOBALS);
+    stack().Push(**g);
 }
 
 void lua::State::GetConst(int32_t idx)
@@ -87,11 +167,75 @@ void lua::State::GetRK(int32_t idx)
         PushValue(idx + 1);
 }
 
+void lua::State::LoadVararg(int32_t n)
+{
+    if (n < 0)
+        n = (int32_t)stack().varargs.size();
+    stack().Check(n);
+    stack().PushN(stack().varargs, n);
+}
+
+void lua::State::LoadProto(int32_t idx)
+{
+    auto& stk = stack();
+    auto subProto = stk.closure->proto->Protos[(size_t)idx];
+    auto& closure = vm->NewLuaClosure(subProto);
+    stk.Push(&closure);
+    for (size_t i = 0; i < subProto.Upvalues.size(); i++)
+    {
+        auto& uvInfo = subProto.Upvalues[i];
+        auto uvIdx = uvInfo.Idx;
+        if (1 == uvInfo.Instack)
+        {
+            auto [it, ok] = stk.openuvs.try_emplace(uvIdx, nullptr);
+            if (ok)
+            {
+                it->second = std::make_shared<Upvalue>(stk.slots[uvIdx]);
+            }
+            closure.upvals[i] = it->second;
+        }
+        else
+        {
+            closure.upvals[i] = stk.closure->upvals[uvIdx];
+        }
+    }
+}
+
+size_t lua::State::GetTop()
+{
+    return stack().top;
+}
+
+int32_t lua::State::RegisterCount()
+{
+    return stack().closure->proto->MaxStackSize;
+}
+
 uint8_t lua::State::GetTable(int32_t idx)
 {
     auto t = stack().Get(idx);
     auto k = stack().Pop();
+    return GetTable(t, *k, false);
+}
+
+uint8_t lua::State::GetField(int32_t idx, std::string k)
+{
+    auto t = stack().Get(idx);
     return GetTable(t, k, false);
+}
+
+bool lua::State::GetSubTable(int32_t idx, std::string fname)
+{
+    if (GetField(idx, fname) == type::TABLE)
+    {
+        return true;
+    }
+    Pop(1);
+    idx = stack().AbsIndex(idx);
+    NewTable();
+    PushValue(-1);
+    SetField(idx, std::move(fname));
+    return false;
 }
 
 void lua::State::SetTable(int32_t idx)
@@ -99,13 +243,39 @@ void lua::State::SetTable(int32_t idx)
     auto t = stack().Get(idx);
     auto v = stack().Pop();
     auto k = stack().Pop();
-    SetTable(t, k, std::move(v), false);
+    SetTable(t, *k, std::move(*v), false);
+}
+
+void lua::State::SetField(int32_t idx, std::string k)
+{
+    auto t = stack().Get(idx);
+    auto v = stack().Pop();
+    SetTable(t, k, std::move(*v), false);
+}
+
+void lua::State::SetGlobal(std::string k)
+{
+    auto& t = *registry.Get(cv::RIDX_GLOBALS);
+    auto v = stack().Pop();
+    SetTable(*t, k, std::move(*v), false);
+}
+
+void lua::State::SetI(int32_t idx, int64_t i)
+{
+    auto t = stack().Get(idx);
+    auto v = stack().Pop();
+    SetTable(t, i, std::move(*v), false);
 }
 
 void lua::State::CreateTable(int32_t nArr, int32_t nRec)
 {
     auto& t = vm->NewLuaTable(size_t(nArr), size_t(nRec));
     stack().Push(&t);
+}
+
+void lua::State::NewTable()
+{
+    CreateTable(0, 0);
 }
 
 void lua::State::Copy(int32_t fromIdx, int32_t toIdx)
@@ -116,7 +286,7 @@ void lua::State::Copy(int32_t fromIdx, int32_t toIdx)
 
 void lua::State::Replace(int32_t idx)
 {
-    stack().Set(idx, stack().Pop());
+    stack().Set(idx, std::move(*stack().Pop()));
 }
 
 void lua::State::AddPC(int32_t n)
@@ -126,6 +296,19 @@ void lua::State::AddPC(int32_t n)
 
 void lua::State::CloseUpvalues(int32_t n)
 {
+    auto& ovs = stack().openuvs;
+    for (auto it = ovs.begin(); it != ovs.end();)
+    {
+        auto&& [i, openuv] = *it;
+        if (i + 1 >= n)
+        {
+            auto val = std::make_shared<Value>(std::move(*openuv->val));
+            openuv->val = std::move(val);
+            it = ovs.erase(it);
+        }
+        else
+            ++it;
+    }
 }
 
 void lua::State::Call(int32_t nArgs, int32_t nRes)
@@ -203,7 +386,7 @@ void lua::State::Concat(int32_t n)
         {
             auto b = stack().Pop();
             auto a = stack().Pop();
-            if (auto [res, ok] = CallMetamethod(a, b, str::CONCAT); ok)
+            if (auto [res, ok] = CallMetamethod(std::move(*a), std::move(*b), str::CONCAT); ok)
             {
                 stack().Push(std::move(res));
             }
@@ -215,14 +398,40 @@ void lua::State::Concat(int32_t n)
     }
 }
 
-bool lua::State::ToBoolean(int32_t idx)
-{
-    return stack().Get(idx).ConvertToBoolean();
-}
-
 void lua::State::CheckStack(int32_t n)
 {
     stack().Check(n);
+}
+
+void lua::State::SetTop(int32_t idx)
+{
+    auto newTop = stack().AbsIndex(idx);
+    if (newTop < 0)
+    {
+        // TODO error
+    }
+
+    auto n = stack().top - newTop;
+    if (n > 0)
+    {
+        for (size_t i = 0; i < n; i++)
+        {
+            stack().Pop();
+        }
+    }
+    else if (n < 0)
+    {
+        for (int32_t i = 0; i > n; i--)
+        {
+            stack().Push(nullptr);
+        }
+    }
+}
+
+void lua::State::Remove(int32_t idx)
+{
+    Rotate(idx, -1);
+    Pop(1);
 }
 
 uint8_t lua::State::Type(int32_t idx)
@@ -233,6 +442,43 @@ uint8_t lua::State::Type(int32_t idx)
     }
 
     return type::NONE;
+}
+
+bool lua::State::IsNil(int32_t idx)
+{
+    return Type(idx) == type::NIL;
+}
+
+bool lua::State::ToBoolean(int32_t idx)
+{
+    return stack().Get(idx).ConvertToBoolean();
+}
+
+int64_t lua::State::ToInteger(int32_t idx)
+{
+    return ToIntegerX(idx).first;
+}
+
+std::pair<int64_t, bool> lua::State::ToIntegerX(int32_t idx)
+{
+    return stack().Get(idx).ConvertToInteger();
+}
+
+double lua::State::ToFloat(int32_t idx)
+{
+    return ToFloatX(idx).first;
+}
+
+std::pair<double, bool> lua::State::ToFloatX(int32_t idx)
+{
+    return stack().Get(idx).ConvertToFloat();
+}
+
+Value lua::State::ToNumber(int32_t idx)
+{
+    auto val = stack().Get(idx).ConvertToNumber();
+    auto i = val.index();
+    return 3 == i || 2 == i ? std::move(val) : 0;
 }
 
 bool lua::State::IsString(int32_t idx)
@@ -274,7 +520,7 @@ std::pair<std::string, bool> lua::State::ToStringX(int32_t idx)
         val);
 }
 
-std::pair<Value, bool> lua::State::CallMetamethod(Value a, Value b, const char* mmName)
+std::pair<ValuePtr, bool> lua::State::CallMetamethod(Value a, Value b, const char* mmName)
 {
     auto mm = a.GetMetafield(mmName, this);
     if (!mm)
@@ -299,9 +545,10 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c)
     auto nParams = c->proto->NumParams;
     bool isVararg = c->proto->IsVararg;
 
+    auto& oldStack = stack();
     auto& newStack = PushLuaStack(cv::MINSTACK + nRegs, this);
     newStack.closure = c;
-    auto funcAndArgs = stack().PopN(nArgs + 1);
+    auto funcAndArgs = oldStack.PopN(nArgs + 1);
     newStack.PushN(funcAndArgs, nParams, 1);
     newStack.top = nRegs;  // to max
     if (nArgs > nParams && isVararg)
@@ -315,6 +562,28 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c)
     if (nRes)
     {
         auto results = newStack.PopN(newStack.top - nRegs);
+        stack().Check(results.size());
+        stack().PushN(results, nRes);
+    }
+}
+
+void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c)
+{
+    auto& oldStack = stack();
+    auto& newStack = PushLuaStack(cv::MINSTACK + nArgs, this);
+    newStack.closure = c;
+    if (nArgs > 0)
+    {
+        auto args = oldStack.PopN(nArgs);
+        newStack.PushN(args, nArgs);
+    }
+    oldStack.Pop();
+
+    auto r = c->func(this);
+    auto res = PopLuaStack();
+    if (nRes)
+    {
+        auto results = newStack.PopN(r);
         stack().Check(results.size());
         stack().PushN(results, nRes);
     }
@@ -338,7 +607,7 @@ uint8_t lua::State::GetTable(const Value& t, const Value& k, bool raw)
     if (t.IsTable())
     {
         auto tbl = std::get<Table*>(t);
-        auto v = tbl->Get(k);
+        auto& v = *tbl->Get(k);
         if (raw || v || !tbl->HasMetafield(str::INDEX))
         {
             stack().Push(v ? *v : nullptr);

@@ -2,31 +2,42 @@
 #define _STRUCT_H
 
 #include "Value.h"
+#include "stdlib/libtype.h"
 
 namespace lua
 {
+struct Upvalue
+{
+    ValuePtr val;
+};
+
+using UpvaluePtr = std::shared_ptr<Upvalue>;
+
 struct Closure
 {
-    Prototype* proto{};
-    std::vector<Value*> upvals;
+    const Prototype* proto{};
+    Function func{};
+    std::vector<UpvaluePtr> upvals;
 
-    Closure(Prototype* p);
+    Closure(const Prototype* p);
+    Closure(Function f, size_t nUpvals);
 };
 
 struct Stack
 {
-    std::vector<Value> slots;
+    std::vector<ValuePtr> slots;
     size_t top{};
     State* state{};
     Closure* closure{};
-    std::vector<Value> varargs;
-    std::unordered_map<size_t, Value*> openuvs;
+    std::vector<ValuePtr> varargs;
+    std::unordered_map<size_t, UpvaluePtr> openuvs;
     size_t pc{};
     Stack* prev{};
 
     Stack(size_t size, State* st);
 
     void Check(size_t n);
+    Value& Push(ValuePtr&& val);
     template <typename T>
     auto& Push(T&& v)
     {
@@ -34,14 +45,14 @@ struct Stack
         {
             // TODO error
         }
-        slots[top] = std::forward<T>(v);
+        slots[top] = std::make_unique<Value>(std::forward<T>(v));
         ++top;
-        return slots[top];
+        return *slots[top];
     }
-    Value Pop();
+    ValuePtr Pop();
 
-    void PushN(std::vector<Value>& vals, int64_t n, size_t start = 0);
-    std::vector<Value> PopN(int64_t n);
+    void PushN(std::vector<ValuePtr>& vals, int64_t n, size_t start = 0);
+    std::vector<ValuePtr> PopN(int64_t n);
     size_t AbsIndex(int64_t idx) const;
     Value Get(int64_t idx) const;
     void Set(int64_t idx, Value val);
@@ -59,8 +70,8 @@ private:
 
 public:
     Table* metatable{};
-    std::vector<Value> arr;
-    std::unordered_map<Value, Value> map;
+    std::vector<ValuePtr> arr;
+    std::unordered_map<Value, ValuePtr> map;
     std::unordered_map<Value, const Value*> keys;
     uint8_t changed{1};
 
@@ -70,7 +81,7 @@ public:
     bool HasMetafield(const std::string& fieldName) const;
     size_t Len() const;
 
-    Value* Get(const Value& key);
+    const ValuePtr* Get(const Value& key);
 
     void Put(Value&& key, Value&& val);
     const Value* NextKey(const Value& key);

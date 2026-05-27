@@ -427,7 +427,15 @@ void lua::FuncInfo::EmitNewTable(slot_type a, slot_type nArr, slot_type nRec)
 
 void lua::FuncInfo::EmitSetList(slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::SETLIST, a, b, c);
+    if (c < (1 << 9))
+    {
+        EmitABC(Op::SETLIST, a, b, c);
+    }
+    else
+    {
+        EmitABC(Op::SETLIST, a, b, 0);
+        EmitAx(Op::EXTRAARG, c - 1);
+    }
 }
 
 void lua::FuncInfo::EmitConcat(slot_type a, slot_type b, slot_type c)

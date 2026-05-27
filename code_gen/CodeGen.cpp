@@ -827,11 +827,11 @@ std::any lua::CodeGen::visitForgeneric(LuaParser::ForgenericContext* ctx)
     static const std::string forGeneratorVar = "(for generator)";
     static const std::string forStateVar = "(for state)";
     static const std::string forControlVar = "(for control)";
-    static const std::string forClosingVar = "(for closing)";
+    // static const std::string forClosingVar = "(for closing)";
 
     auto exps = ctx->explist()->exp();
     fi->EnterScope(true);
-    DoVarDecl(exps, {forGeneratorVar, forStateVar, forControlVar, forClosingVar});
+    DoVarDecl(exps, {forGeneratorVar, forStateVar, forControlVar /*, forClosingVar*/});
     auto names = ctx->namelist()->NAME();
     for (auto&& nn : names)
     {
@@ -845,12 +845,12 @@ std::any lua::CodeGen::visitForgeneric(LuaParser::ForgenericContext* ctx)
 
     auto r = fi->SlotOfLocVar(forGeneratorVar);
     fi->EmitTForCall(r, (slot_type)names.size());
-    fi->EmitForLoop(r + 2, int32_t(pcJmpToTFC - fi->PC()));
+    fi->EmitTForLoop(r + 2, int32_t(pcJmpToTFC - fi->PC()));
     fi->ExitScope(fi->PC() - 1);
     fi->FixEndPC(forGeneratorVar, 2);
     fi->FixEndPC(forStateVar, 2);
     fi->FixEndPC(forControlVar, 2);
-    fi->FixEndPC(forClosingVar, 2);
+    // fi->FixEndPC(forClosingVar, 2);
 
     return std::any();
 }
@@ -1292,14 +1292,14 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
             auto tmp = fi->AllocReg();
             auto lastMult = i + 1 == nExps && multRet;
             VisitWithPara(tmp, lastMult ? -1 : 1, valExp);
-            constexpr auto flushSize = 50;
+            constexpr auto flushSize = cv::LFIELDS_PER_FLUSH;
             if (arrIdx % flushSize == 0 || arrIdx == nArr)
             {
                 auto n = arrIdx % flushSize;
                 if (!n)
                     n = flushSize;
                 fi->FreeRegs(n);
-                auto c = (arrIdx - 1) / 50 + 1;
+                auto c = (arrIdx - 1) / flushSize + 1;
                 fi->EmitSetList(a, lastMult ? 0 : n, c);
             }
             continue;

@@ -3,7 +3,11 @@
 
 using namespace lua;
 
-lua::Closure::Closure(Prototype* p) : proto{p}, upvals(p->Upvalues.size())
+lua::Closure::Closure(const Prototype* p) : proto{p}, upvals(p->Upvalues.size())
+{
+}
+
+lua::Closure::Closure(Function f, size_t nUpvals) : func(f), upvals(nUpvals)
 {
 }
 
@@ -16,11 +20,22 @@ void lua::Stack::Check(size_t n)
     auto free = slots.size() - top;
     for (size_t i = free; i < n; i++)
     {
-        slots.emplace_back();
+        slots.emplace_back(Value::Nil());
     }
 }
 
-Value lua::Stack::Pop()
+Value& lua::Stack::Push(ValuePtr&& val)
+{
+    if (top == slots.size())
+    {
+        // TODO error
+    }
+    slots[top] = std::move(val);
+    ++top;
+    return *slots[top];
+}
+
+ValuePtr lua::Stack::Pop()
 {
     if (top < 1)
     {
@@ -29,11 +44,11 @@ Value lua::Stack::Pop()
 
     --top;
     auto v = std::move(slots.back());
-    slots.back() = nullptr;
+    slots.back() = Value::Nil();
     return v;
 }
 
-void lua::Stack::PushN(std::vector<Value>& vals, int64_t n, size_t start)
+void lua::Stack::PushN(std::vector<ValuePtr>& vals, int64_t n, size_t start)
 {
     auto nV = vals.size();
     if (n < 0)
@@ -42,13 +57,13 @@ void lua::Stack::PushN(std::vector<Value>& vals, int64_t n, size_t start)
     }
     for (size_t i = start; i < n; i++)
     {
-        Push(i < nV ? std::move(vals[i]) : nullptr);
+        Push(i < nV ? std::move(vals[i]) : Value::Nil());
     }
 }
 
-std::vector<Value> lua::Stack::PopN(int64_t n)
+std::vector<ValuePtr> lua::Stack::PopN(int64_t n)
 {
-    std::vector<Value> v;
+    std::vector<ValuePtr> v;
     if (n > 0)
     {
         v.resize(n);
@@ -79,7 +94,7 @@ Value lua::Stack::Get(int64_t idx) const
         {
             return nullptr;
         }
-        return closure->upvals[uvIdx];
+        return *closure->upvals[uvIdx]->val;
     }
     if (idx == cv::REGISTRYINDEX)
     {
@@ -88,7 +103,7 @@ Value lua::Stack::Get(int64_t idx) const
     auto absIdx = AbsIndex(idx);
     if (absIdx > 0 && absIdx <= top)
     {
-        return slots[absIdx - 1];
+        return *slots[absIdx - 1];
     }
     return nullptr;
 }
@@ -100,7 +115,7 @@ void lua::Stack::Set(int64_t idx, Value val)
         auto uvIdx = cv::REGISTRYINDEX - idx - 1;
         if (closure && uvIdx < closure->upvals.size())
         {
-            *closure->upvals[uvIdx] = std::move(val);
+            *closure->upvals[uvIdx]->val = std::move(val);
         }
         return;
     }
@@ -112,7 +127,7 @@ void lua::Stack::Set(int64_t idx, Value val)
     auto absIdx = AbsIndex(idx);
     if (absIdx > 0 && absIdx <= top)
     {
-        slots[absIdx - 1] = std::move(val);
+        slots[absIdx - 1] = std::make_unique<Value>(std::move(val));
     }
     return;
 }
@@ -156,7 +171,7 @@ int64_t lua::Table::KeyToInt(const Value& key)
 
 void lua::Table::ShrinkArray()
 {
-    while (arr.back().IsNil())
+    while (arr.back()->IsNil())
     {
         map.emplace(int64_t(arr.size()), std::move(arr.back()));
         arr.pop_back();
@@ -168,7 +183,7 @@ void lua::Table::ExpandArray()
     for (size_t i = arr.size() + 1;; ++i)
     {
         auto it = map.find(int64_t(i));
-        if (it != map.end() && !it->second.IsNil())
+        if (it != map.end() && !it->second->IsNil())
         {
             auto n = map.extract(it);
             arr.emplace_back(std::move(n.mapped()));
@@ -195,7 +210,7 @@ size_t lua::Table::Len() const
     return arr.size();
 }
 
-Value* lua::Table::Get(const Value& key)
+const ValuePtr* lua::Table::Get(const Value& key)
 {
     int64_t idx = KeyToInt(key);
     if (idx >= 1 && idx <= arr.size())
@@ -205,7 +220,7 @@ Value* lua::Table::Get(const Value& key)
 
     auto it = map.find(key);
 
-    return it == map.end() || it->second.IsNil() ? nullptr : &it->second;
+    return it == map.end() || it->second->IsNil() ? nullptr : &it->second;
 }
 
 void lua::Table::Put(Value&& key, Value&& val)
@@ -214,13 +229,14 @@ void lua::Table::Put(Value&& key, Value&& val)
 
     changed = 1;
     int64_t idx = KeyToInt(key);
+    auto valPtr = std::make_unique<Value>(std::move(val));
     if (idx >= 1)
     {
         auto arrLen = arr.size();
         if (idx <= arrLen)
         {
             bool isNil = val.IsNil();
-            arr[idx - 1] = std::move(val);
+            arr[idx - 1] = std::move(valPtr);
             if (idx == arrLen && isNil)
             {
                 // tombstone
@@ -231,12 +247,12 @@ void lua::Table::Put(Value&& key, Value&& val)
         if (idx == arrLen + 1)
         {
             map.erase(key);
-            arr.emplace_back(std::move(val));
+            arr.emplace_back(std::move(valPtr));
             ExpandArray();
             return;
         }
     }
-    map.insert_or_assign(std::move(key), std::move(val));
+    map.insert_or_assign(std::move(key), std::move(valPtr));
 }
 
 const Value* lua::Table::NextKey(const Value& key)
@@ -256,11 +272,11 @@ void lua::Table::InitKeys()
     changed = 0;
     for (int64_t i = 0; i < arr.size(); i++)
     {
-        keys[i] = arr[i].index() ? &arr[i] : nullptr;
+        keys[i] = arr[i]->index() ? arr[i].get() : nullptr;
     }
     for (auto&& [k, v] : map)
     {
-        keys[k] = v.index() ? &v : nullptr;
+        keys[k] = v->index() ? v.get() : nullptr;
     }
     if (keys.empty())
     {

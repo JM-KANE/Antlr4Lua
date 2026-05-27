@@ -174,15 +174,50 @@ struct CompareOperator
 };
 struct Eq : CompareOperator
 {
+    static constexpr auto field_name = str::EQ;
     template <typename T1, typename T2>
-    bool operator()(T1&& a, T2&& b) const
+    int8_t operator()(T1&& a, T2&& b) const
     {
         using DT1 = std::decay_t<T1>;
         using DT2 = std::decay_t<T2>;
         if constexpr (std::is_same_v<DT1, DT2> || is_lua_number_v<DT1, DT2>)
-            return a == b;
+        {
+            if (a == b)
+                return 1;
+            if constexpr (std::is_same_v<DT1, Table*>)
+            {
+                return -1;
+            }
+        }
+        return 0;
+    }
+};
+struct Lt : CompareOperator
+{
+    static constexpr auto field_name = str::LT;
+    template <typename T1, typename T2>
+    int8_t operator()(T1&& a, T2&& b) const
+    {
+        using DT1 = std::decay_t<T1>;
+        using DT2 = std::decay_t<T2>;
+        if constexpr (std::is_same_v<DT1, std::string> && std::is_same_v<DT2, std::string> || is_lua_number_v<DT1, DT2>)
+            return a < b;
         else
-            return {};
+            return -1;
+    }
+};
+struct Le : CompareOperator
+{
+    static constexpr auto field_name = str::LE;
+    template <typename T1, typename T2>
+    int8_t operator()(T1&& a, T2&& b) const
+    {
+        using DT1 = std::decay_t<T1>;
+        using DT2 = std::decay_t<T2>;
+        if constexpr (std::is_same_v<DT1, std::string> && std::is_same_v<DT2, std::string> || is_lua_number_v<DT1, DT2>)
+            return a <= b;
+        else
+            return -1;
     }
 };
 

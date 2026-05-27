@@ -4,6 +4,11 @@
 
 using namespace lua;
 
+std::unique_ptr<Value> lua::Value::Nil()
+{
+    return std::make_unique<Value>();
+}
+
 uint8_t lua::Value::TypeOf() const
 {
     return std::visit(
@@ -45,6 +50,37 @@ Value lua::Value::ConvertToNumber() const
         *this);
 }
 
+std::pair<int64_t, bool> lua::Value::ConvertToInteger() const
+{
+    auto v = ConvertToNumber();
+    return std::visit(
+        [](auto&& arg) -> std::pair<int64_t, bool>
+        {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int64_t>)
+                return {arg, true};
+            else if constexpr (std::is_same_v<T, double>)
+                return aux::FloatToInteger(arg);
+            else
+                return {};
+        },
+        v);
+}
+
+std::pair<double, bool> lua::Value::ConvertToFloat() const
+{
+    auto v = ConvertToNumber();
+    return std::visit(
+        [](auto&& arg) -> std::pair<int64_t, bool>
+        {
+            if constexpr (is_lua_number_v<decltype(arg)>)
+                return {arg, true};
+            else
+                return {};
+        },
+        v);
+}
+
 bool lua::Value::ConvertToBoolean() const
 {
     return std::visit(
@@ -68,7 +104,7 @@ Table* lua::Value::GetMetatable(State* ls) const
         return std::get<Table*>(*this)->metatable;
     }
     auto key = "_MT" + std::to_string(TypeOf());
-    if (auto mt = ls->registry.Get(key); mt->IsTable())
+    if (auto& mt = *ls->registry.Get(key); mt->IsTable())
     {
         return std::get<Table*>(*mt)->metatable;
     }
@@ -79,7 +115,8 @@ Value* lua::Value::GetMetafield(const std::string& fieldName, State* ls) const
 {
     if (auto mt = GetMetatable(ls))
     {
-        mt->Get(fieldName);
+        if (auto pv = mt->Get(fieldName))
+            return pv->get();
     }
 
     return nullptr;
