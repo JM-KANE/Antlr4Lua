@@ -32,7 +32,7 @@ int main(int argc, const char* argv[])
 
     auto cg = CodeGen();
     auto p = cg.Generate(chunk);
-    VirtualMachine vm;
+    VirtualMachine vm(argc, argv);
     vm.Run(p);
     ifs.close();
     return 0;

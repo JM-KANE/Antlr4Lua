@@ -125,14 +125,14 @@ size_t lua::FuncInfo::IndexOfConstant(any_type k)
 
 slot_type lua::FuncInfo::AddLocVar(std::string name, size_t startPC)
 {
-    auto& newVar = locVars.emplace_back(std::move(name), scopeLv, AllocReg(), startPC, 0);
-    auto [it, suc] = locNames.try_emplace(newVar.name, &newVar);
+    auto& newVar = locVars.emplace_back(std::make_unique<LocVarInfo>(std::move(name), scopeLv, AllocReg(), startPC, 0));
+    auto [it, suc] = locNames.try_emplace(newVar->name, newVar.get());
     if (!suc)
     {
-        newVar.prev = it->second;
-        it->second = &newVar;
+        newVar->prev = it->second;
+        it->second = newVar.get();
     }
-    return newVar.slot;
+    return newVar->slot;
 }
 
 void lua::FuncInfo::RemoveLocVar(LocVarInfo* locVar)
@@ -261,9 +261,9 @@ void lua::FuncInfo::FixEndPC(const std::string& name, int32_t delta)
 {
     for (auto it = locVars.rbegin(); it != locVars.rend(); it++)
     {
-        if (it->name == name)
+        if ((*it)->name == name)
         {
-            it->endPC += delta;
+            (*it)->endPC += delta;
             return;
         }
     }
@@ -514,7 +514,7 @@ void lua::FuncInfo::GetLocVars(std::vector<Prototype::LocVar>& v)
     v.reserve(locVars.size());
     for (auto&& locVar : locVars)
     {
-        v.emplace_back(std::move(locVar.name), uint32_t(locVar.startPC), uint32_t(locVar.endPC));
+        v.emplace_back(std::move(locVar->name), uint32_t(locVar->startPC), uint32_t(locVar->endPC));
     }
 }
 
@@ -523,6 +523,6 @@ void lua::FuncInfo::ToSubProtos(std::vector<Prototype>& v)
     v.reserve(subFuncs.size());
     for (auto&& fi : subFuncs)
     {
-        v.emplace_back(fi.ToProto());
+        v.emplace_back(fi->ToProto());
     }
 }

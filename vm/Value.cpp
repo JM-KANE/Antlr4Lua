@@ -121,3 +121,58 @@ Value* lua::Value::GetMetafield(const std::string& fieldName, State* ls) const
 
     return nullptr;
 }
+
+void lua::Value::Mark(std::vector<Value>& grey) const
+{
+    std::visit(
+        [&](auto&& arg)
+        {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, Table*> || std::is_same_v<T, Closure*> || std::is_same_v<T, State*>)
+                arg->Mark(grey);
+        },
+        *this);
+}
+
+void lua::Value::MarkChildren(std::vector<Value>& grey)
+{
+    std::visit(
+        [&](auto&& arg)
+        {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, Table*> || std::is_same_v<T, Closure*> || std::is_same_v<T, State*>)
+                arg->MarkChildren(grey);
+        },
+        *this);
+}
+
+void lua::Value::SetBlack()
+{
+    SetColor(2);
+}
+
+void lua::Value::SetColor(uint8_t c)
+{
+    std::visit(
+        [&](auto&& arg)
+        {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, Table*> || std::is_same_v<T, Closure*> || std::is_same_v<T, State*>)
+                arg->color = c;
+        },
+        *this);
+}
+
+uint8_t lua::Value::Color() const
+{
+    return std::visit(
+        [&](auto&& arg)
+        {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, Table*> || std::is_same_v<T, Closure*> || std::is_same_v<T, State*>)
+                return arg->color;
+            else
+                return uint8_t();
+        },
+        *this);
+}

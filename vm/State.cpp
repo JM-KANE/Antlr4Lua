@@ -5,12 +5,28 @@
 #include "State.h"
 using namespace lua;
 
-lua::State::State() : registry(8, 0)
+lua::State::State(VirtualMachine* _vm, Table& reg) : registry(reg), vm(_vm)
 {
-    registry.Put(cv::RIDX_MAINTHREAD, this);
-    globals.map.reserve(20);
-    registry.Put(cv::RIDX_GLOBALS, &globals);
-    PushLuaStack(cv::MINSTACK, this);
+}
+
+void lua::State::Mark(std::vector<Value>& grey)
+{
+    if (!color)
+    {
+        color = 1;
+        grey.emplace_back(this);
+    }
+}
+
+void lua::State::MarkChildren(std::vector<Value>& grey)
+{
+    registry.Mark(grey);
+    for (auto&& stk : stacks)
+    {
+        stk->Mark(grey);
+    }
+
+    // thread
 }
 
 void lua::State::OpenLibs()
@@ -26,6 +42,11 @@ void lua::State::OpenLibs()
         RequireF(name, f, true);
         Pop(1);
     }
+}
+
+Table* lua::State::GetArgs()
+{
+    return vm->GetArgs();
 }
 
 void lua::State::RequireF(const char* modname, Function openf, bool glb)
@@ -81,12 +102,17 @@ void lua::State::PushFuncClosure(Function f, int32_t n)
     stack().Push(&closure);
 }
 
-Stack& lua::State::PushLuaStack(size_t size, State* st)
+Stack& lua::State::PushLuaStack(std::unique_ptr<Stack>&& stk)
 {
     auto& stackPrev = stack();
-    auto& stack = stacks.emplace_back(std::make_unique<Stack>(size, st));
+    auto& stack = stacks.emplace_back(std::move(stk));
     stack->prev = &stackPrev;
     return *stack;
+}
+
+Stack& lua::State::PushLuaStack(size_t size, State* st)
+{
+    return PushLuaStack(std::make_unique<Stack>(size, st));
 }
 
 std::unique_ptr<Stack> lua::State::PopLuaStack()
@@ -302,8 +328,9 @@ void lua::State::CloseUpvalues(int32_t n)
         auto&& [i, openuv] = *it;
         if (i + 1 >= n)
         {
-            auto val = std::make_shared<Value>(std::move(*openuv->val));
-            openuv->val = std::move(val);
+            // auto val = std::make_shared<Value>(std::move(*openuv->val));
+            // openuv->val = std::move(val);
+            vm->AddClosed(openuv->val);
             it = ovs.erase(it);
         }
         else
@@ -520,6 +547,24 @@ std::pair<std::string, bool> lua::State::ToStringX(int32_t idx)
         val);
 }
 
+void lua::State::CollectGarbage()
+{
+    vm->CollectGarbage();
+}
+
+void lua::State::CheckGC()
+{
+    vm->CheckGC();
+}
+
+void lua::State::Barrier(const Value& parent, const Value& child)
+{
+    if (vm->gc.state == Collector::State::PROPAGATE && 2 == parent.Color() && 0 == child.Color())
+    {
+        child.Mark(vm->gc.grey);
+    }
+}
+
 std::pair<ValuePtr, bool> lua::State::CallMetamethod(Value a, Value b, const char* mmName)
 {
     auto mm = a.GetMetafield(mmName, this);
@@ -546,22 +591,23 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c)
     bool isVararg = c->proto->IsVararg;
 
     auto& oldStack = stack();
-    auto& newStack = PushLuaStack(cv::MINSTACK + nRegs, this);
-    newStack.closure = c;
+    auto newStack = std::make_unique<Stack>(cv::MINSTACK + nRegs, this);
+    newStack->closure = c;
     auto funcAndArgs = oldStack.PopN(nArgs + 1);
-    newStack.PushN(funcAndArgs, nParams, 1);
-    newStack.top = nRegs;  // to max
+    newStack->PushN(funcAndArgs, nParams, 1);
+    newStack->top = nRegs;  // to max
     if (nArgs > nParams && isVararg)
     {
-        newStack.varargs = std::vector(std::make_move_iterator(funcAndArgs.begin() + nParams),
-                                       std::make_move_iterator(funcAndArgs.end()));
+        newStack->varargs = std::vector(std::make_move_iterator(funcAndArgs.begin() + nParams),
+                                        std::make_move_iterator(funcAndArgs.end()));
     }
 
+    PushLuaStack(std::move(newStack));
     RunLuaClosure();
-    auto res = PopLuaStack();
+    newStack = PopLuaStack();
     if (nRes)
     {
-        auto results = newStack.PopN(newStack.top - nRegs);
+        auto results = newStack->PopN(newStack->top - nRegs);
         stack().Check(results.size());
         stack().PushN(results, nRes);
     }
@@ -570,20 +616,21 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c)
 void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c)
 {
     auto& oldStack = stack();
-    auto& newStack = PushLuaStack(cv::MINSTACK + nArgs, this);
-    newStack.closure = c;
+    auto newStack = std::make_unique<Stack>(cv::MINSTACK + nArgs, this);
+    newStack->closure = c;
     if (nArgs > 0)
     {
         auto args = oldStack.PopN(nArgs);
-        newStack.PushN(args, nArgs);
+        newStack->PushN(args, nArgs);
     }
     oldStack.Pop();
 
+    PushLuaStack(std::move(newStack));
     auto r = c->func(this);
-    auto res = PopLuaStack();
+    newStack = PopLuaStack();
     if (nRes)
     {
-        auto results = newStack.PopN(r);
+        auto results = newStack->PopN(r);
         stack().Check(results.size());
         stack().PushN(results, nRes);
     }
@@ -595,6 +642,7 @@ void lua::State::RunLuaClosure()
     {
         Instruction inst = Fetch();
         inst.Execute(this);
+        CheckGC();
         if (inst.Opcode() == Op::RETURN)
         {
             return;
@@ -660,6 +708,8 @@ void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
         auto old = tbl->Get(k);
         if (raw || old || !tbl->HasMetafield(str::NEWINDEX))
         {
+            Barrier(t, k);
+            Barrier(t, v);
             tbl->Put(Value{k}, std::move(v));
             return;
         }

@@ -15,50 +15,16 @@ using UpvaluePtr = std::shared_ptr<Upvalue>;
 
 struct Closure
 {
+    uint8_t color{};
     const Prototype* proto{};
     Function func{};
     std::vector<UpvaluePtr> upvals;
 
     Closure(const Prototype* p);
     Closure(Function f, size_t nUpvals);
-};
 
-struct Stack
-{
-    std::vector<ValuePtr> slots;
-    size_t top{};
-    State* state{};
-    Closure* closure{};
-    std::vector<ValuePtr> varargs;
-    std::unordered_map<size_t, UpvaluePtr> openuvs;
-    size_t pc{};
-    Stack* prev{};
-
-    Stack(size_t size, State* st);
-
-    void Check(size_t n);
-    Value& Push(ValuePtr&& val);
-    template <typename T>
-    auto& Push(T&& v)
-    {
-        if (top == slots.size())
-        {
-            // TODO error
-        }
-        slots[top] = std::make_unique<Value>(std::forward<T>(v));
-        ++top;
-        return *slots[top];
-    }
-    ValuePtr Pop();
-
-    void PushN(std::vector<ValuePtr>& vals, int64_t n, size_t start = 0);
-    std::vector<ValuePtr> PopN(int64_t n);
-    size_t AbsIndex(int64_t idx) const;
-    Value Get(int64_t idx) const;
-    void Set(int64_t idx, Value val);
-    void Reverse(size_t from, size_t to);
-
-    bool IsValid(int32_t idx) const;
+    void Mark(std::vector<Value>& grey);
+    void MarkChildren(std::vector<Value>& grey);
 };
 
 struct Table
@@ -69,6 +35,7 @@ private:
     void ExpandArray();
 
 public:
+    uint8_t color{};
     Table* metatable{};
     std::vector<ValuePtr> arr;
     std::unordered_map<Value, ValuePtr> map;
@@ -86,6 +53,9 @@ public:
     void Put(Value&& key, Value&& val);
     const Value* NextKey(const Value& key);
     void InitKeys();
+
+    void Mark(std::vector<Value>& grey);
+    void MarkChildren(std::vector<Value>& grey);
 };
 
 }  // namespace lua

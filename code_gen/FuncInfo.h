@@ -95,11 +95,11 @@ struct LocVarInfo
 struct FuncInfo
 {
     FuncInfo* parent{};
-    std::vector<FuncInfo> subFuncs;
+    std::vector<std::unique_ptr<FuncInfo>> subFuncs;
     slot_type usedRegs{};
     slot_type maxRegs{128};
     uint32_t scopeLv{};
-    std::vector<LocVarInfo> locVars;
+    std::vector<std::unique_ptr<LocVarInfo>> locVars;
     string_ref_map<LocVarInfo*> locNames;
     std::unordered_map<std::string, UpvalInfo> upvalues;
     std::unordered_map<any_type, size_t> constants;

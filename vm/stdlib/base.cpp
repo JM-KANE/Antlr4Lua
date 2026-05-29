@@ -4,16 +4,18 @@ using namespace lua;
 using namespace stdlib;
 namespace
 {
-constexpr FuncReg<23> funcs{
+constexpr FuncReg<32> funcs{
     pair_type{"print", base::Print},
     {"assert", base::Assert},
     {"error", base::Error},
+    {"warn", nullptr},
     {"select", base::Select},
     {"ipairs", base::IPairs},
     {"pairs", base::Pairs},
     {"next", base::Next},
     {"load", base::Load},
     {"loadfile", base::LoadFile},
+    {"loadstring", nullptr},
     {"dofile", base::DoFile},
     {"pcall", base::PCall},
     {"xpcall", base::XPCall},
@@ -26,9 +28,16 @@ constexpr FuncReg<23> funcs{
     {"type", base::Type},
     {"tostring", base::ToString},
     {"tonumber", base::ToNumber},
+    {"collectgarbage", nullptr},
+    {"getfenv", nullptr},
+    {"setfenv", nullptr},
+    {"newproxy", nullptr},
+    {"module", nullptr},
+    {"unpack", nullptr},
 
     {"_G", nullptr},
     {"_VERSION", nullptr},
+    {"arg", nullptr},
 };
 }  // namespace
 
@@ -40,6 +49,8 @@ int32_t lua::stdlib::OpenBaseLib(State* ls)
     ls->SetField(-2, "_G");
     ls->PushString("Lua 5.3");
     ls->SetField(-2, "_VERSION");
+    ls->PushAny(ls->GetArgs());
+    ls->SetField(-2, "arg");
     return 1;
 }
 

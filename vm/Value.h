@@ -11,14 +11,15 @@ namespace cv
 constexpr auto MINSTACK = 20;
 constexpr auto MAXSTACK = 1'000'000;
 constexpr auto REGISTRYINDEX = -MAXSTACK - 1000;
+
 constexpr auto RIDX_MAINTHREAD = 1;
 constexpr auto RIDX_GLOBALS = 2;
 }  // namespace cv
 
 struct State;
 struct Table;
-using BaseValue =
-    std::variant<std::nullptr_t, bool, int64_t, double, std::string, struct Table*, struct Closure*, void*>;
+struct Closure;
+using BaseValue = std::variant<std::nullptr_t, bool, int64_t, double, std::string, Table*, Closure*, State*>;
 
 template <typename... Ts>
 using is_lua_number = std::conjunction<
@@ -72,6 +73,12 @@ struct Value : public BaseValue
 
     Table* GetMetatable(State* ls) const;
     Value* GetMetafield(const std::string& fieldName, State* ls) const;
+
+    void Mark(std::vector<Value>& grey) const;
+    void MarkChildren(std::vector<Value>& grey);
+    void SetBlack();
+    void SetColor(uint8_t c);
+    uint8_t Color() const;
 };
 
 using ValuePtr = std::shared_ptr<Value>;

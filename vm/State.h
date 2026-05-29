@@ -1,24 +1,28 @@
 #ifndef _STATE_H
 #define _STATE_H
 
-#include "Struct.h"
+#include "Stack.h"
 namespace lua
 {
 namespace op
 {
 struct Le;
 }  // namespace op
-
+class VirtualMachine;
 struct State
 {
-    class VirtualMachine* vm{};
+    uint8_t color{};
+    VirtualMachine* vm{};
+    Table& registry;
     std::vector<std::unique_ptr<Stack>> stacks;
-    Table registry;
-    Table globals;
 
-    State();
+    State(VirtualMachine* _vm, Table& reg);
+    void Mark(std::vector<Value>& grey);
+    void MarkChildren(std::vector<Value>& grey);
 
     void OpenLibs();
+    Table* GetArgs();
+
     void RequireF(const char* modname, Function openf, bool glb);
 
     auto& stack() const
@@ -31,6 +35,7 @@ struct State
 
     void PushFunction(Function f);
     void PushFuncClosure(Function f, int32_t n);
+    Stack& PushLuaStack(std::unique_ptr<Stack>&& stk);
     Stack& PushLuaStack(size_t size, State* st);
     std::unique_ptr<Stack> PopLuaStack();
 
@@ -166,6 +171,9 @@ struct State
     bool IsString(int32_t idx);
     std::string ToString(int32_t idx);
     std::pair<std::string, bool> ToStringX(int32_t idx);
+    void CollectGarbage();
+    void CheckGC();
+    void Barrier(const Value& parent, const Value& child);
 
     std::pair<ValuePtr, bool> CallMetamethod(Value a, Value b, const char* mmName);
     void CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c);

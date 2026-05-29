@@ -350,7 +350,7 @@ Prototype lua::CodeGen::ToProto() const
 std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self)
 {
     auto a = _a;
-    auto& subFi = fi->subFuncs.emplace_back(fi);
+    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(fi));
 
     if (self)
     {
@@ -382,7 +382,7 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
 
 std::any lua::CodeGen::visitChunk(LuaParser::ChunkContext* ctx)
 {
-    auto& subFi = fi->subFuncs.emplace_back(fi);
+    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(fi));
     fi = &subFi;
     visitBlock(ctx->block());
     fi = subFi.parent;
