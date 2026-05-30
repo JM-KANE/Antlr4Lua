@@ -146,9 +146,12 @@ private:
     State main;
 
 public:
+    std::ostream* out = &std::cout;
+    std::ostream* err = &std::cerr;
+    Prototype proto;
     Collector gc;
     VirtualMachine(int argc, const char** argv);
-    void Run(const Prototype& p);
+    void Run();
 
     Closure& NewLuaClosure(const Prototype& p);
     Closure& NewFuncClosure(Function f, size_t nUpvals);

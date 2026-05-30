@@ -53,7 +53,9 @@ public:
     slot_type ConstantToOpArg(const any_type& cv);
     slot_type VisitMember(LuaParser::MemberContext* member);
 
+    void Generate(const std::string& data, Prototype& proto);
     Prototype Generate(LuaParser::ChunkContext* ck);
+    void Generate(LuaParser::ChunkContext* ck, Prototype& proto);
     Prototype ToProto() const;
 
     std::any DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self);

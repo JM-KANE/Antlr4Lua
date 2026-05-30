@@ -446,6 +446,12 @@ void lua::FuncInfo::EmitConcat(slot_type a, slot_type b, slot_type c)
 Prototype lua::FuncInfo::ToProto()
 {
     Prototype proto;
+    ToProto(proto);
+    return proto;
+}
+
+void lua::FuncInfo::ToProto(Prototype& proto)
+{
     proto.LineDefined = line;
     proto.LastLineDefined = lastLine;
     proto.NumParams = (uint8_t)numParams;
@@ -469,8 +475,6 @@ Prototype lua::FuncInfo::ToProto()
     {
         proto.IsVararg = 1;
     }
-
-    return proto;
 }
 
 void lua::FuncInfo::GetConstants(std::vector<any_type>& v)

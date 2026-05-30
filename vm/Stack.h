@@ -20,7 +20,9 @@ struct Stack
 
     void Check(size_t n);
     Value& Push(ValuePtr&& val);
+    Value& Push(const ValuePtr& val);
     template <typename T>
+        requires(!std::is_assignable_v<ValuePtr, T>)
     Value& Push(T&& v)
     {
         return Push(std::make_shared<Value>(std::forward<T>(v)));

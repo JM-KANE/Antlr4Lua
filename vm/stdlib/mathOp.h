@@ -1,5 +1,5 @@
-#ifndef _MATH_H
-#define _MATH_H
+#ifndef _MATHOP_H
+#define _MATHOP_H
 #include "libtype.h"
 
 namespace lua
@@ -10,10 +10,10 @@ namespace stdlib
 {
 
 int32_t OpenMathLib(State* ls);
-namespace math
+namespace mathOp
 {
 
-}  // namespace math
+}  // namespace mathOp
 
 }  // namespace stdlib
 

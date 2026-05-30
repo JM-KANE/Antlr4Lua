@@ -38,6 +38,10 @@ constexpr char CONCAT[] = "__concat";
 constexpr char EQ[] = "__eq";
 constexpr char LT[] = "__lt";
 constexpr char LE[] = "__le";
+constexpr char NAME[] = "__name";
+constexpr char PAIRS[] = "__pairs";
+constexpr char METATABLE[] = "__metatable";
+constexpr char TOSTRING[] = "__tostring";
 
 }  // namespace str
 
@@ -171,6 +175,7 @@ struct FuncInfo
     void EmitConcat(slot_type a, slot_type b, slot_type c);
 
     Prototype ToProto();
+    void ToProto(Prototype& proto);
     void GetConstants(std::vector<any_type>& v);
     void GetUpvalues(std::vector<Prototype::Upvalue>& v);
     void GetUpvalueNames(std::vector<std::string>& v);

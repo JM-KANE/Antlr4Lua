@@ -12,8 +12,9 @@ constexpr auto MINSTACK = 20;
 constexpr auto MAXSTACK = 1'000'000;
 constexpr auto REGISTRYINDEX = -MAXSTACK - 1000;
 
-constexpr auto RIDX_MAINTHREAD = 1;
-constexpr auto RIDX_GLOBALS = 2;
+constexpr int64_t RIDX_MAINTHREAD = 1;
+constexpr int64_t RIDX_GLOBALS = 2;
+constexpr int64_t MULTRET = -1;
 }  // namespace cv
 
 struct State;
@@ -73,6 +74,7 @@ struct Value : public BaseValue
 
     Table* GetMetatable(State* ls) const;
     Value* GetMetafield(const std::string& fieldName, State* ls) const;
+    void SetMetatable(Table* mt, State* ls);
 
     void Mark(std::vector<Value>& grey) const;
     void MarkChildren(std::vector<Value>& grey);

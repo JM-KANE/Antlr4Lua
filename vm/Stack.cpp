@@ -1,4 +1,5 @@
 #include "State.h"
+#include "Stack.h"
 
 using namespace lua;
 
@@ -25,6 +26,12 @@ Value& lua::Stack::Push(ValuePtr&& val)
     slots[top] = std::move(val);
     ++top;
     return *slots[top];
+}
+
+Value& lua::Stack::Push(const ValuePtr& val)
+{
+    auto v = val;
+    return Push(std::move(v));
 }
 
 ValuePtr lua::Stack::Pop()

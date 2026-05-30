@@ -230,20 +230,11 @@ lua::VirtualMachine::VirtualMachine(int _argc, const char** _argv)
     main.PushLuaStack(cv::MINSTACK, &main);
 }
 
-void lua::VirtualMachine::Run(const Prototype& p)
+void lua::VirtualMachine::Run()
 {
     main.OpenLibs();
-
-    // TODO Load
-    auto& c = NewLuaClosure(p);
-    main.stack().Push(&c);
-    if (!p.Upvalues.empty())
-    {
-        auto& env = *main.registry.Get(cv::RIDX_GLOBALS);
-        c.upvals.front() = std::make_unique<Upvalue>(env);
-    }
-
-    main.Call(0, -1);
+    main.LoadFile(argv[1]);
+    main.Call((int32_t)argc - 2, -1);
 }
 
 Closure& lua::VirtualMachine::NewLuaClosure(const Prototype& p)

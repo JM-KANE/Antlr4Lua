@@ -23,6 +23,10 @@ uint8_t lua::Value::TypeOf() const
                 return type::STRING;
             else if constexpr (std::is_same_v<T, Table*>)
                 return type::TABLE;
+            else if constexpr (std::is_same_v<T, Closure*>)
+                return type::FUNCTION;
+            else if constexpr (std::is_same_v<T, State*>)
+                return type::THREAD;
             else
                 return type::NIL;
         },
@@ -104,9 +108,9 @@ Table* lua::Value::GetMetatable(State* ls) const
         return std::get<Table*>(*this)->metatable;
     }
     auto key = "_MT" + std::to_string(TypeOf());
-    if (auto& mt = *ls->registry.Get(key); mt->IsTable())
+    if (auto mt = ls->registry.Get(key); mt && (*mt)->IsTable())
     {
-        return std::get<Table*>(*mt)->metatable;
+        return std::get<Table*>(**mt)->metatable;
     }
     return nullptr;
 }
@@ -120,6 +124,21 @@ Value* lua::Value::GetMetafield(const std::string& fieldName, State* ls) const
     }
 
     return nullptr;
+}
+
+void lua::Value::SetMetatable(Table* mt, State* ls)
+{
+    if (IsTable())
+    {
+        std::get<Table*>(*this)->metatable = mt;
+        ls->Barrier(*this, mt);
+    }
+    else
+    {
+        auto key = "_MT" + std::to_string(TypeOf());
+        ls->registry.Put(key, mt);
+        ls->Barrier(&ls->registry, mt);
+    }
 }
 
 void lua::Value::Mark(std::vector<Value>& grey) const

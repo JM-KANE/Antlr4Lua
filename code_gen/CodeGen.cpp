@@ -1,5 +1,7 @@
 #include "CodeGen.h"
 #include "aux.h"
+#include "LuaLexer.h"
+#include "LuaParser.h"
 
 using namespace lua;
 using namespace lua::aux;
@@ -331,15 +333,41 @@ slot_type lua::CodeGen::VisitMember(LuaParser::MemberContext* member)
     return p.first;
 }
 
+void lua::CodeGen::Generate(const std::string& data, Prototype& proto)
+{
+    antlr4::ANTLRInputStream input(data);
+    LuaLexer lexer(&input);
+    antlr4::CommonTokenStream tokens(&lexer);
+    LuaParser parser(&tokens);
+    if (parser.getNumberOfSyntaxErrors() > 0)
+    {
+        std::cout << "lua file syntax error" << std::endl;
+    }
+    for (auto t : tokens.getTokens())
+    {
+        std::cout << t->toString() << std::endl;
+    }
+
+    auto chunk = parser.chunk();
+    Generate(chunk, proto);
+}
+
 Prototype lua::CodeGen::Generate(LuaParser::ChunkContext* ck)
 {
     root = std::make_unique<FuncInfo>();
     root->AddLocVar(str::ENV, 0);
     fi = root.get();
-
     visitChunk(ck);
-
     return ToProto();
+}
+
+void lua::CodeGen::Generate(LuaParser::ChunkContext* ck, Prototype& proto)
+{
+    root = std::make_unique<FuncInfo>();
+    root->AddLocVar(str::ENV, 0);
+    fi = root.get();
+    visitChunk(ck);
+    root->ToProto(proto);
 }
 
 Prototype lua::CodeGen::ToProto() const
