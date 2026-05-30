@@ -4,6 +4,7 @@
 #include "Value.h"
 #include <utility>
 #include <cmath>
+#include <functional>
 namespace lua
 {
 
@@ -12,9 +13,9 @@ namespace op
 
 struct divides
 {
-    double operator()(double a, double b) const
+    auto operator()(auto a, auto b) const
     {
-        return a / b;
+        return double(a) / double(b);
     }
 };
 struct idivides
@@ -40,9 +41,9 @@ struct modulus
 };
 struct power
 {
-    double operator()(double a, double b) const
+    auto operator()(auto a, auto b) const
     {
-        return std::pow(a, b);
+        return std::pow(double(a), double(b));
     }
 };
 template <typename COP>

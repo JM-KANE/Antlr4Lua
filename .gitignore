@@ -1,6 +1,9 @@
-build
-generated
-dist
+build/
+out/
+generated/
+dist/
 *.lua
 *.out
 .vscode
+.vs
+CMakeUserPresets.json

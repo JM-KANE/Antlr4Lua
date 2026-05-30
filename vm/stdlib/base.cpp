@@ -6,7 +6,7 @@ using namespace lua;
 using namespace stdlib;
 namespace
 {
-constexpr FuncReg<32> baseFuncs{
+constexpr FuncReg<26> baseFuncs{
     pair_type{"print", base::Print},
     {"assert", base::Assert},
     {"error", base::Error},
@@ -34,7 +34,7 @@ constexpr FuncReg<32> baseFuncs{
 
     {"_G", nullptr},
     {"_VERSION", nullptr},
-    {"arg", nullptr},
+    // {"arg", nullptr},
 };
 
 int32_t iPairsAux(State* ls)
@@ -95,8 +95,8 @@ int32_t lua::stdlib::OpenBaseLib(State* ls)
     ls->SetField(-2, "_G");
     ls->PushString("Lua 5.3");
     ls->SetField(-2, "_VERSION");
-    ls->PushAny(ls->GetArgs());
-    ls->SetField(-2, "arg");
+    //ls->PushAny(ls->GetArgs());
+    //ls->SetField(-2, "arg");
     return 1;
 }
 
@@ -108,7 +108,7 @@ int32_t lua::stdlib::base::Print(State* ls)
 int32_t lua::stdlib::base::Assert(State* ls)
 {
     if (ls->ToBoolean(1))
-        return ls->GetTop();
+        return (int32_t)ls->GetTop();
     ls->CheckAny(1);
     ls->Remove(1);
     ls->PushString("assertion failed!");
@@ -243,16 +243,16 @@ int32_t lua::stdlib::base::DoFile(State* ls)
         return ls->Error();
     }
     ls->Call(0, cv::RIDX_GLOBALS);
-    return ls->GetTop() - 1;
+    return (int32_t)ls->GetTop() - 1;
 }
 
 int32_t lua::stdlib::base::PCall(State* ls)
 {
     auto nArgs = ls->GetTop() - 1;
-    auto status = ls->PCall(nArgs, -1, 0);
+    auto status = ls->PCall((int32_t)nArgs, -1, 0);
     ls->PushBoolean(status == TStatus::OK);
     ls->Insert(1);
-    return ls->GetTop();
+    return (int32_t)ls->GetTop();
 }
 
 int32_t lua::stdlib::base::XPCall(State* ls)
@@ -261,10 +261,10 @@ int32_t lua::stdlib::base::XPCall(State* ls)
     ls->Rotate(2, -1);
     auto i = (int32_t)ls->CheckInteger(-1);  // TODO
     ls->Pop(1);
-    auto status = ls->PCall(nArgs, -1, i);
+    auto status = ls->PCall((int32_t)nArgs, -1, i);
     ls->PushBoolean(status == TStatus::OK);
     ls->Insert(1);
-    return ls->GetTop();
+    return (int32_t)ls->GetTop();
 }
 
 int32_t lua::stdlib::base::GetMetatable(State* ls)

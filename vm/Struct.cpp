@@ -82,7 +82,7 @@ size_t lua::Table::Len() const
 const ValuePtr* lua::Table::Get(const Value& key)
 {
     int64_t idx = KeyToInt(key);
-    if (idx >= 1 && idx <= arr.size())
+    if (idx >= 1 && idx <= (int64_t)arr.size())
     {
         return &arr[idx - 1];
     }
@@ -102,9 +102,9 @@ void lua::Table::Put(Value&& key, Value&& val)
     if (idx >= 1)
     {
         auto arrLen = arr.size();
-        if (idx <= arrLen)
+        if (idx <= (int64_t)arrLen)
         {
-            bool isNil = val.IsNil();
+            bool isNil = valPtr->IsNil();
             arr[idx - 1] = std::move(valPtr);
             if (idx == arrLen && isNil)
             {
@@ -139,9 +139,9 @@ void lua::Table::InitKeys()
     }
 
     changed = 0;
-    for (int64_t i = 0; i < arr.size(); i++)
+    for (size_t i = 0; i < arr.size(); i++)
     {
-        keys[i] = arr[i]->index() ? arr[i].get() : nullptr;
+        keys[(int64_t)i] = arr[i]->index() ? arr[i].get() : nullptr;
     }
     for (auto&& [k, v] : map)
     {

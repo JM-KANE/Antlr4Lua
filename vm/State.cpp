@@ -63,14 +63,11 @@ TStatus lua::State::Load(const std::string& data, const std::string& chunkName, 
         c.upvals.front() = std::make_unique<Upvalue>(env);
     }
 
-    GetGlobal("args");
-    auto nArgs = Len2(-1);
-    for (int64_t i = 1; i <= nArgs; i++)
+    auto nArgs = vm->argc - 2;
+    for (int64_t i = 0; i < nArgs; i++)
     {
-        PushInteger(i);
-        GetTable(2);
+        PushString(vm->argv[i + 2]);
     }
-    Remove(2);
     return TStatus::OK;
 }
 
@@ -135,7 +132,7 @@ void lua::State::Rotate(int64_t idx, int64_t n)
 {
     auto t = stack().top - 1;
     auto p = stack().AbsIndex(idx) - 1;
-    int32_t m = n >= 0 ? t - n : p - n - 1;
+    int64_t m = n >= 0 ? t - n : p - n - 1;
     stack().Reverse(p, m);
     stack().Reverse(m + 1, t);
     stack().Reverse(p, t);
@@ -165,9 +162,9 @@ void lua::State::PushFuncClosure(Function f, int32_t n)
 
 Stack& lua::State::PushLuaStack(std::unique_ptr<Stack>&& stk)
 {
-    auto& stackPrev = stack();
+    auto stackPrev = stacks.empty() ? nullptr : &stack();
     auto& stack = stacks.emplace_back(std::move(stk));
-    stack->prev = &stackPrev;
+    stack->prev = stackPrev;
     return *stack;
 }
 
@@ -323,7 +320,7 @@ bool lua::State::GetSubTable(int32_t idx, std::string fname)
         return true;
     }
     Pop(1);
-    idx = stack().AbsIndex(idx);
+    idx = (int32_t)stack().AbsIndex(idx);
     NewTable();
     PushValue(-1);
     SetField(idx, std::move(fname));
@@ -815,7 +812,7 @@ std::pair<std::string, bool> lua::State::ToStringX(int32_t idx)
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, int64_t>)
                 return {std::to_string(arg), true};
-            else if constexpr (std::is_same_v<T, std::string>)
+            else if constexpr (std::is_same_v<T, double>)
             {
                 std::ostringstream os;
                 os << std::setprecision(15) << arg;
@@ -1063,8 +1060,10 @@ uint8_t lua::State::GetTable(const Value& t, const Value& k, bool raw)
         auto v = tbl->Get(k);
         if (raw || v || !tbl->HasMetafield(str::INDEX))
         {
-            stack().Push(v ? **v : nullptr);
-            return (*v)->TypeOf();
+            auto val = v && *v ? **v : Value{};
+            auto t = val.TypeOf();
+            stack().Push(std::move(val));
+            return t;
         }
     }
     if (!raw)

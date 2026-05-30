@@ -107,7 +107,7 @@ public:
     };
 
 private:
-    size_t _altNum = antlr4::atn::ATN::INVALID_ALT_NUMBER;
+    mutable size_t _altNum = antlr4::atn::ATN::INVALID_ALT_NUMBER;
 
 public:
     using antlr4::ParserRuleContext::ParserRuleContext;

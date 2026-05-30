@@ -107,7 +107,6 @@ void lua::Collector::InitialCursor()
 {
     auto set = [this](auto& s, auto& cur)
     {
-        Deletor del;
         auto& fl = s.first;
         cur.first = &fl;
         cur.second = fl.before_begin();
@@ -256,7 +255,7 @@ Table* lua::VirtualMachine::GetArgs()
 {
     if (!args)
     {
-        args = std::make_unique<Table>(argc, 0);
+        args = std::make_unique<Table>(argc - 2, 0);
         for (int64_t i = 0; i < argc; i++)
         {
             args->Put(i - 1, std::string(argv[i]));

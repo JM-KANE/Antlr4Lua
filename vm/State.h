@@ -30,15 +30,19 @@ struct State
     template <size_t N>
     void SetFuncs(const FuncReg<N>& l, size_t nup)
     {
-        CheckStack2(nup, "too many upvalues");
+        auto snup = (int32_t)nup;
+        CheckStack2(snup, "too many upvalues");
         for (auto&& [name, fun] : l)
         {
             for (size_t i = 0; i < nup; i++)
             {
-                PushValue(-nup);
+                PushValue(-snup);
             }
-            PushFuncClosure(fun, nup);
-            SetField(-nup - 2, name);
+            if (fun)
+                PushFuncClosure(fun, snup);
+            else
+                PushNil();
+            SetField(-snup - 2, name);
         }
         Pop(nup);
     }
@@ -142,8 +146,10 @@ struct State
             stack().Push(std::move(res));
             return;
         }
+        if constexpr (OP::num_param == 1)
+            b = Value{};
         constexpr auto mm = OP::field_name;
-        auto [resM, ok] = CallMetamethod(std::move(a), std::move(b), mm);
+        auto [resM, ok] = CallMetamethod(std::move(a), std::move(b), mm);  // unary op
         if (ok)
         {
             stack().Push(std::move(resM));

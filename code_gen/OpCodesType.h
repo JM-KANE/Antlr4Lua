@@ -8,7 +8,7 @@ namespace lua
 
 namespace cv
 {
-constexpr auto MAXARG_Bx = 1 << 18 - 1;      // 262143
+constexpr auto MAXARG_Bx = 1 << (18 - 1);    // 262143
 constexpr auto MAXARG_sBx = MAXARG_Bx >> 1;  // 131071
 constexpr auto LFIELDS_PER_FLUSH = 50;
 }  // namespace cv

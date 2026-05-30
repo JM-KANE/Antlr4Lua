@@ -130,15 +130,13 @@ private:
 class VirtualMachine
 {
 public:
-    friend class Collector;
+    friend struct Collector;
 
 private:
     /* global */
     Table registry;
     Table global;
     std::unique_ptr<Table> args;
-    int64_t argc;
-    const char** argv;
 
     // TODO randomseed
 
@@ -146,6 +144,8 @@ private:
     State main;
 
 public:
+    int64_t argc;
+    const char** argv;
     std::ostream* out = &std::cout;
     std::ostream* err = &std::cerr;
     Prototype proto;

@@ -42,8 +42,8 @@ ValuePtr lua::Stack::Pop()
     }
 
     --top;
-    auto v = std::move(slots.back());
-    slots.back() = Value::Nil();
+    auto v = std::move(slots[top]);
+    slots[top] = Value::Nil();
     return v;
 }
 
@@ -54,7 +54,7 @@ void lua::Stack::PushN(std::vector<ValuePtr>& vals, int64_t n, size_t start)
     {
         n = nV;
     }
-    for (size_t i = start; i < n; i++)
+    for (size_t i = start; i < size_t(n); i++)
     {
         Push(i < nV ? std::move(vals[i]) : Value::Nil());
     }
@@ -66,7 +66,7 @@ std::vector<ValuePtr> lua::Stack::PopN(int64_t n)
     if (n > 0)
     {
         v.resize(n);
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < size_t(n); i++)
         {
             auto val = Pop();
             *(v.rbegin() + i) = std::move(val);
@@ -89,7 +89,7 @@ Value lua::Stack::Get(int64_t idx) const
     if (idx < cv::REGISTRYINDEX)
     {
         auto uvIdx = cv::REGISTRYINDEX - idx - 1;
-        if (!closure || uvIdx >= closure->upvals.size())
+        if (!closure || uvIdx >= (int64_t)closure->upvals.size())
         {
             return nullptr;
         }
@@ -112,7 +112,7 @@ void lua::Stack::Set(int64_t idx, Value val)
     if (idx < cv::REGISTRYINDEX)
     {
         auto uvIdx = cv::REGISTRYINDEX - idx - 1;
-        if (closure && uvIdx < closure->upvals.size())
+        if (closure && uvIdx < (int64_t)closure->upvals.size())
         {
             *closure->upvals[uvIdx]->val = std::move(val);
         }
@@ -136,7 +136,7 @@ void lua::Stack::Reverse(size_t from, size_t to)
 {
     if (to > from)
     {
-        std::reverse(slots.begin() + from, slots.end() + to + 1);
+        std::reverse(slots.begin() + from, slots.begin() + to + 1);
     }
 }
 

@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(AntlrLua LANGUAGES CXX)
+project(Antlr4Lua LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+
+# set(ANTLR_PATH "/usr/local/lib/antlr-4.13.2-complete.jar" CACHE FILEPATH "path of antlr-*.jar")
 
 option(debug "" OFF)
 if(debug)

@@ -22,7 +22,7 @@ struct Stack
     Value& Push(ValuePtr&& val);
     Value& Push(const ValuePtr& val);
     template <typename T>
-        requires(!std::is_assignable_v<ValuePtr, T>)
+        requires(!std::is_assignable_v<ValuePtr, T> || std::is_same_v<std::nullptr_t, std::decay_t<T>>)
     Value& Push(T&& v)
     {
         return Push(std::make_shared<Value>(std::forward<T>(v)));

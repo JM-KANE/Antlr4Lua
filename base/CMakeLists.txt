@@ -32,7 +32,8 @@ set(LUA_BASE
     ${PROJECT_SOURCE_DIR}/base/LuaRuleContext.cpp
 )
 
-set(ANTLR java -Xmx500M -cp "/usr/local/lib/antlr-4.13.2-complete.jar:$CLASSPATH" org.antlr.v4.Tool)
+# set(ANTLR java -Xmx500M -cp "/usr/local/lib/antlr-4.13.2-complete.jar" org.antlr.v4.Tool)
+set(ANTLR java -Xmx500M -cp ${ANTLR_PATH} org.antlr.v4.Tool)
 add_custom_command(
     OUTPUT 
         ${GEN_SRC}

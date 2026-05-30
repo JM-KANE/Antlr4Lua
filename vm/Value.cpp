@@ -75,10 +75,10 @@ std::pair<double, bool> lua::Value::ConvertToFloat() const
 {
     auto v = ConvertToNumber();
     return std::visit(
-        [](auto&& arg) -> std::pair<int64_t, bool>
+        [](auto&& arg) -> std::pair<double, bool>
         {
             if constexpr (is_lua_number_v<decltype(arg)>)
-                return {arg, true};
+                return {(double)arg, true};
             else
                 return {};
         },

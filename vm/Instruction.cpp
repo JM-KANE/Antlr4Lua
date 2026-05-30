@@ -24,7 +24,7 @@ lua::Op lua::Instruction::Opcode() const
 
 std::array<int32_t, 3> lua::Instruction::ABC() const
 {
-    return {int32_t(*this >> 6 & 0xFF), int32_t(*this >> 14 & 0x1FF), int32_t(*this >> 23 & 0x1FF)};
+    return {int32_t(*this >> 6 & 0xFF), int32_t(*this >> 23 & 0x1FF), int32_t(*this >> 14 & 0x1FF)};
 }
 
 std::array<int32_t, 2> lua::Instruction::ABx() const
@@ -46,6 +46,8 @@ int32_t lua::Instruction::Ax() const
 
 void lua::Instruction::Execute(State* ls)
 {
-    auto action = OpCode::Get()[std::size_t(Opcode())].action;
+    auto& reg = OpCode::Get();
+    auto op = Opcode();
+    auto action = reg[std::size_t(op)].action;
     action(*this, ls);
 }

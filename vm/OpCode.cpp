@@ -24,7 +24,7 @@ int32_t Fb2int(int32_t x)
 void move(Instruction i, State* ls)
 {
     auto [a, b, _] = i.ABC();
-    ls->Copy(a + 1, b + 1);
+    ls->Copy(b + 1, a + 1);
 }
 // R(A) := Kst(Bx)
 void loadK(Instruction i, State* ls)
@@ -59,7 +59,7 @@ void loadNil(Instruction i, State* ls)
     auto [a, b, _] = i.ABC();
     ++a;
     ls->PushNil();
-    for (size_t i = a; i <= a + b; i++)
+    for (int32_t i = a; i <= a + b; i++)
     {
         ls->Copy(-1, i);
     }
@@ -295,7 +295,7 @@ int32_t PushFuncAndArgs(int32_t a, int32_t b, State* ls)
     else
     {
         FixStack(a, ls);
-        return ls->GetTop() - ls->RegisterCount() - 1;
+        return (int32_t)ls->GetTop() - ls->RegisterCount() - 1;
     }
 }
 void PopResults(int32_t a, int32_t c, State* ls)
@@ -442,7 +442,7 @@ void setList(Instruction i, State* ls)
     }
     if (isZero)
     {
-        for (size_t j = ls->RegisterCount(); j < ls->GetTop(); j++)
+        for (int32_t j = ls->RegisterCount(); j < ls->GetTop(); j++)
         {
             ++idx;
             ls->PushValue(j);
