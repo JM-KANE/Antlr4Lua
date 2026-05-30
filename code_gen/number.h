@@ -1,5 +1,5 @@
-#ifndef _AUX_H
-#define _AUX_H
+#ifndef _NUMBER_H
+#define _NUMBER_H
 
 #include <string>
 #include <charconv>
@@ -7,7 +7,7 @@
 
 namespace lua
 {
-namespace aux
+namespace number
 {
 
 enum class NumType
@@ -29,7 +29,7 @@ double ToHexFloat(const std::string& str, std::from_chars_result* res = {});
 
 std::pair<int64_t, bool> FloatToInteger(double f);
 
-}  // namespace aux
+}  // namespace number
 
 }  // namespace lua
 #endif

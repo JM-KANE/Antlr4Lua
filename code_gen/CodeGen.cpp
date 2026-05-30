@@ -1,10 +1,10 @@
 #include "CodeGen.h"
-#include "aux.h"
+#include "number.h"
 #include "LuaLexer.h"
 #include "LuaParser.h"
 
 using namespace lua;
-using namespace lua::aux;
+using namespace lua::number;
 
 std::string lua::CodeGen::Unescape(std::string_view src)
 {

@@ -1,9 +1,9 @@
-#include "aux.h"
+#include "number.h"
 #include <algorithm>
 
 namespace lua
 {
-namespace aux
+namespace number
 {
 std::string Trim(const std::string& s)
 {
@@ -92,5 +92,5 @@ std::pair<int64_t, bool> FloatToInteger(double f)
     return std::pair<int64_t, bool>(i, i == f);
 }
 
-}  // namespace aux
+}  // namespace number
 }  // namespace lua

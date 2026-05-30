@@ -1,6 +1,6 @@
 #include "State.h"
 #include "Value.h"
-#include "../code_gen/aux.h"
+#include "../code_gen/number.h"
 
 using namespace lua;
 
@@ -45,7 +45,7 @@ Value lua::Value::ConvertToNumber() const
             }
             else if constexpr (std::is_same_v<T, std::string>)
             {
-                auto v = aux::ToNum(arg);
+                auto v = number::ToNum(arg);
                 return std::visit([](auto& arg_) -> Value { return arg_; }, v);
             }
             else
@@ -64,7 +64,7 @@ std::pair<int64_t, bool> lua::Value::ConvertToInteger() const
             if constexpr (std::is_same_v<T, int64_t>)
                 return {arg, true};
             else if constexpr (std::is_same_v<T, double>)
-                return aux::FloatToInteger(arg);
+                return number::FloatToInteger(arg);
             else
                 return {};
         },

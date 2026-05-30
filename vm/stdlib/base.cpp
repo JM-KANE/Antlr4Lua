@@ -1,7 +1,7 @@
 #include "base.h"
 #include "table.h"
 #include "../VirtualMachine.h"
-#include "../code_gen/aux.h"
+#include "../code_gen/number.h"
 using namespace lua;
 using namespace stdlib;
 namespace
@@ -364,7 +364,7 @@ int32_t lua::stdlib::base::ToNumber(State* ls)
         auto s = ls->ToString(1);
         auto base = int(ls->CheckInteger(2));
         ls->ArgCheck(2 <= base && base <= 36, 2, "base out of range");
-        auto str = aux::Trim(s);
+        auto str = number::Trim(s);
         auto cs = str.c_str();
         int64_t val;
         if (std::from_chars(cs, cs + str.size(), val, base).ec == std::errc{})
