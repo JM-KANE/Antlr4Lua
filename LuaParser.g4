@@ -15,11 +15,11 @@ options {
 }
 
 start_
-    : chunk EOF
+    : chunk
     ;
 
 chunk
-    : block
+    : block EOF
     ;
 
 block

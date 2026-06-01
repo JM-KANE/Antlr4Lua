@@ -46,6 +46,7 @@ std::ostream& lua::State::Err() const
 TStatus lua::State::Load(const std::string& data, std::string chunkName, std::string_view mode)
 {
     auto& p = vm->NewProto();
+    p.Source = std::move(chunkName);
     TStatus st{};
     if (false)
     {
@@ -65,7 +66,6 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
         return st;
     }
 
-    p.Source = std::move(chunkName);
     auto& c = vm->NewLuaClosure(p);
     stack().Push(&c);
     if (!p.Upvalues.empty())
@@ -136,6 +136,9 @@ void lua::State::RequireF(const char* modname, Function openf, bool glb)
 
 void lua::State::Rotate(int64_t idx, int64_t n)
 {
+    auto top = stack().top;
+    if (top <= 1)
+        return;
     auto t = stack().top - 1;
     auto p = stack().AbsIndex(idx) - 1;
     int64_t m = n >= 0 ? t - n : p - n - 1;
@@ -204,24 +207,31 @@ std::pair<uint32_t, bool> lua::State::CurrentLine(uint32_t level) const
     return {stk->CurrentLine(), true};
 }
 
-std::pair<uint32_t, const TopPrototype*> lua::State::Where(uint32_t level) const
+std::pair<uint32_t, const TopPrototype*> lua::State::Where(size_t level) const
 {
-    if (level)
-        return {};
+    //if (!level)
+    //    return {};
     auto stk = &stack();
     const Prototype* proto{};
     uint32_t line{};
     size_t i = 0;
     while (1)
     {
-        if (auto protoC = stk->closure->proto)
+        if (stk->closure)
         {
-            ++i;
-            if (i == level)
+            if (auto protoC = stk->closure->proto)
             {
+                ++i;
                 proto = protoC;
-                line = stk->CurrentLine();
-                break;
+                if (i == level)
+                {
+                    line = stk->CurrentLine();
+                    break;
+                }
+                else if (i > level)  // level == 0
+                {
+                    break;
+                }
             }
         }
         if (auto prev = stk->prev)
@@ -231,6 +241,10 @@ std::pair<uint32_t, const TopPrototype*> lua::State::Where(uint32_t level) const
         }
         else
             break;
+    }
+    if (!proto)
+    {
+        throw "internal error";
     }
     return {line, proto->Top()};
 }
@@ -555,6 +569,8 @@ void lua::State::Call(int32_t nArgs, int32_t nRes)
             CallFuncClosure(nArgs, nRes, c);
         }
     }
+
+    // TODO error
 }
 
 TStatus lua::State::PCall(int32_t nArgs, int32_t nRes, int32_t msgh)
@@ -618,7 +634,12 @@ bool lua::State::RawEqual(int32_t idx1, int32_t idx2)
 
 void lua::State::Throw()
 {
-    status = Catch(Err());
+    if (exception)
+    {
+        Err() << vm->argv[0] << ": ";
+        status = Catch(Err());
+        Err() << std::endl;
+    }
 }
 
 TStatus lua::State::Catch(std::ostream& os)
@@ -626,7 +647,7 @@ TStatus lua::State::Catch(std::ostream& os)
     if (exception)
     {
         auto st = exception->Status();
-        os << *exception << std::endl;
+        os << *exception;
         exception.reset();
         return st;
     }
@@ -757,18 +778,18 @@ void lua::State::SetTop(int32_t idx)
     {
         // TODO error
     }
-
-    auto n = stack().top - newTop;
-    if (n > 0)
+                            
+    auto top = stack().top;
+    if (top > newTop)
     {
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < top - newTop; i++)
         {
             stack().Pop();
         }
     }
-    else if (n < 0)
+    else if (top < newTop)
     {
-        for (int32_t i = 0; i > n; i--)
+        for (size_t i = 0; i < newTop - top; i++)
         {
             stack().Push(nullptr);
         }

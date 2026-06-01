@@ -3,7 +3,7 @@ using namespace lua;
 
 std::string lua::SyntaxError::Msg() const
 {
-    return std::to_string(line) + "; " + msg;
+    return std::to_string(line) + ": " + msg;
 }
 
 void ErrorCollector::syntaxError(antlr4::Recognizer* recognizer, antlr4::Token* offendingSymbol, size_t line,

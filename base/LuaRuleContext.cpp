@@ -104,10 +104,10 @@ void lua::LuaRuleContext::setAltNumber(size_t altNumber)
 
 uint32_t lua::LuaRuleContext::Line() const
 {
-    return FindFirstNonNullStart()->getLine();
+    return (uint32_t)FindFirstNonNullStart()->getLine();
 }
 
 uint32_t lua::LuaRuleContext::LastLine() const
 {
-    return FindFirstNonNullStop()->getLine();
+    return (uint32_t)FindFirstNonNullStop()->getLine();
 }

@@ -58,7 +58,9 @@ int64_t ToInt(const std::string& str, std::from_chars_result* res)
 {
     auto cs = str.c_str();
     int64_t val;
-    std::from_chars(cs, cs + str.size(), val);
+    auto r = std::from_chars(cs, cs + str.size(), val);
+    if (res)
+        *res = r;
     return val;
 }
 
@@ -66,7 +68,9 @@ int64_t ToHex(const std::string& str, std::from_chars_result* res)
 {
     auto cs = str.c_str();
     int64_t val;
-    std::from_chars(cs + 2, cs + str.size(), val, 16);
+    auto r = std::from_chars(cs + 2, cs + str.size(), val, 16);
+    if (res)
+        *res = r;
     return val;
 }
 
@@ -74,7 +78,9 @@ double ToFloat(const std::string& str, std::from_chars_result* res)
 {
     auto cs = str.c_str();
     double val;
-    std::from_chars(cs, cs + str.size(), val);
+    auto r = std::from_chars(cs, cs + str.size(), val);
+    if (res)
+        *res = r;
     return val;
 }
 
@@ -82,7 +88,9 @@ double ToHexFloat(const std::string& str, std::from_chars_result* res)
 {
     auto cs = str.c_str();
     double val;
-    std::from_chars(cs + 2, cs + str.size(), val, std::chars_format::hex);
+    auto r = std::from_chars(cs + 2, cs + str.size(), val, std::chars_format::hex);
+    if (res)
+        *res = r;
     return val;
 }
 

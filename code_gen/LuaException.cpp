@@ -32,7 +32,11 @@ lua::CodeException::CodeException(const TopPrototype* p, size_t l, std::string m
 std::string lua::CodeException::ToString() const
 {
     auto src = proto->ShortSource();
-    return src + std::to_string(line) + "; " + msg;
+    if (line)
+    {
+        src += ':' + std::to_string(line);
+    }
+    return src + ": " + msg;
 }
 
 lua::SyntaxException::SyntaxException(const TopPrototype* p, SyntaxError&& info)

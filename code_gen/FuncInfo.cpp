@@ -12,7 +12,7 @@ void lua::TopPrototype::PrintError(std::ostream& os)
 
 std::string lua::TopPrototype::ShortSource() const
 {
-    if (Source.front() == '@')
+    if (!Source.empty() && Source.front() == '@')
     {
         return Source.substr(1);
     }
@@ -299,25 +299,25 @@ void lua::FuncInfo::EmitInstruction(uint32_t line, uint32_t i)
 void lua::FuncInfo::EmitABC(uint32_t line, Op opcode, slot_type a, slot_type b, slot_type c)
 {
     auto i = uint32_t(opcode) | a << 6 | b << 23 | c << 14;
-    EmitInstruction(i, line);
+    EmitInstruction(line, i);
 }
 
 void lua::FuncInfo::EmitABx(uint32_t line, Op opcode, slot_type a, int32_t bx)
 {
     auto i = uint32_t(opcode) | a << 6 | bx << 14;
-    EmitInstruction(i, line);
+    EmitInstruction(line, i);
 }
 
 void lua::FuncInfo::EmitAsBx(uint32_t line, Op opcode, slot_type a, int32_t bx)
 {
     auto i = uint32_t(opcode) | a << 6 | (bx + cv::MAXARG_sBx) << 14;
-    EmitInstruction(i, line);
+    EmitInstruction(line, i);
 }
 
 void lua::FuncInfo::EmitAx(uint32_t line, Op opcode, int32_t ax)
 {
     auto i = uint32_t(opcode) | ax << 6;
-    EmitInstruction(i, line);
+    EmitInstruction(line, i);
 }
 
 void lua::FuncInfo::EmitReturn(uint32_t line, slot_type a, slot_type n)
@@ -544,7 +544,7 @@ void lua::FuncInfo::GetLocVars(std::vector<Prototype::LocVar>& v)
 
 void lua::FuncInfo::ToSubProtos(Prototype& p)
 {
-    auto v = p.Protos;
+    auto& v = p.Protos;
     v.reserve(subFuncs.size());
     for (auto&& fi : subFuncs)
     {

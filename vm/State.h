@@ -80,7 +80,7 @@ struct State
     Stack& PushLuaStack(size_t size, State* st);
     std::unique_ptr<Stack> PopLuaStack();
     std::pair<uint32_t, bool> CurrentLine(uint32_t level) const;
-    std::pair<uint32_t, const TopPrototype*> Where(uint32_t level) const;
+    std::pair<uint32_t, const TopPrototype*> Where(size_t level) const;
     uint32_t Fetch() const;
     int32_t AbsIndex(int32_t idx);
 

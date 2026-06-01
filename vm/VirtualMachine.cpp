@@ -233,9 +233,8 @@ void lua::VirtualMachine::Run()
 {
     main.OpenLibs();
     auto status = main.LoadFile(argv[1]);
-    auto nArgs = argc - 2;
 
-    // throw syntax
+    // throw compile error
     if (status != TStatus::OK)
     {
         // main.status = status;
@@ -243,13 +242,14 @@ void lua::VirtualMachine::Run()
         return;
     }
 
+    auto nArgs = argc - 2;
     for (int64_t i = 0; i < nArgs; i++)
     {
         main.PushString(argv[i + 2]);
     }
     main.Call((int32_t)argc - 2, -1);
 
-    // throw run
+    // throw runtime error
     main.Throw();
 }
 
