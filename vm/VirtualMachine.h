@@ -148,11 +148,11 @@ public:
     const char** argv;
     std::ostream* out = &std::cout;
     std::ostream* err = &std::cerr;
-    Prototype proto;
+    std::vector<std::unique_ptr<TopPrototype>> topProtos;
     Collector gc;
     VirtualMachine(int argc, const char** argv);
     void Run();
-
+    TopPrototype& NewProto();
     Closure& NewLuaClosure(const Prototype& p);
     Closure& NewFuncClosure(Function f, size_t nUpvals);
     Table& NewLuaTable(size_t nArr, size_t nRec);

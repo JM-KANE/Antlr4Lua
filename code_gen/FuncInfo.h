@@ -61,7 +61,7 @@ struct Prototype
         uint32_t EndPC{};
     };
 
-    std::string Source;
+    Prototype* Parent{};
     uint32_t LineDefined{};
     uint32_t LastLineDefined{};
     uint8_t NumParams{};
@@ -74,6 +74,11 @@ struct Prototype
     std::vector<uint32_t> LineInfo;
     std::vector<LocVar> LocVars;
     std::vector<std::string> UpvalueNames;
+};
+struct TopPrototype : Prototype
+{
+    ErrorCollector ec;
+    std::string Source;
 };
 
 struct UpvalInfo
@@ -174,13 +179,12 @@ struct FuncInfo
     void EmitSetList(slot_type a, slot_type b, slot_type c);
     void EmitConcat(slot_type a, slot_type b, slot_type c);
 
-    Prototype ToProto();
     void ToProto(Prototype& proto);
     void GetConstants(std::vector<any_type>& v);
     void GetUpvalues(std::vector<Prototype::Upvalue>& v);
     void GetUpvalueNames(std::vector<std::string>& v);
     void GetLocVars(std::vector<Prototype::LocVar>& v);
-    void ToSubProtos(std::vector<Prototype>& v);
+    void ToSubProtos(Prototype& p);
 };
 
 }  // namespace lua

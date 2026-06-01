@@ -51,10 +51,13 @@ public:
     std::pair<slot_type, slot_type> ExpToOpArg(const std::vector<LuaParser::ExpContext*>& nodes, uint8_t argKinds);
     std::pair<slot_type, uint8_t> NameToOpArg(const std::string& name, uint8_t argKinds);
     slot_type ConstantToOpArg(const any_type& cv);
+    std::pair<slot_type, uint8_t> PrefixToOpArg(LuaParser::PrefixexpContext* node, uint8_t argKinds);
+
+
     slot_type VisitMember(LuaParser::MemberContext* member);
 
-    void Generate(const std::string& data, Prototype& proto);
-    void Generate(LuaParser::ChunkContext* ck, Prototype& proto);
+    TStatus Generate(const std::string& data, TopPrototype& proto);
+    void GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto);
 
     std::any DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self);
     std::any visitChunk(LuaParser::ChunkContext* ctx) override;

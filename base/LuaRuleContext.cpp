@@ -1,7 +1,6 @@
 #include "LuaParser.h"
 using namespace lua;
-
-size_t lua::LuaRuleContext::getAltNumber() const
+void LuaRuleContext::FixAltNum() const
 {
     if (!_altNum && getRuleIndex() == LuaParser::RuleExp)
     {
@@ -78,6 +77,10 @@ size_t lua::LuaRuleContext::getAltNumber() const
             _altNum = 18;
         }
     }
+}
+size_t lua::LuaRuleContext::getAltNumber() const
+{
+    FixAltNum();
     return _altNum;
 }
 

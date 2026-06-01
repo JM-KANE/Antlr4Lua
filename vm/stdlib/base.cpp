@@ -6,11 +6,11 @@ using namespace lua;
 using namespace stdlib;
 namespace
 {
-constexpr FuncReg<26> baseFuncs{
+constexpr FuncReg<25> baseFuncs{
     pair_type{"print", base::Print},
     {"assert", base::Assert},
     {"error", base::Error},
-    {"warn", base::Warn},
+    // {"warn", base::Warn},
     {"select", base::Select},
     {"ipairs", base::IPairs},
     {"pairs", base::Pairs},
@@ -51,7 +51,7 @@ int32_t outStream(State* ls, std::ostream& os, const char* seg)
     for (size_t i = 1; i <= n; i++)
     {
         ls->PushValue(-1);
-        ls->PushValue(1);
+        ls->PushValue((int32_t)i);
         ls->Call(1, 1);
         auto [s, ok] = ls->ToStringX(-1);
         if (!ok)
@@ -129,10 +129,10 @@ int32_t lua::stdlib::base::Error(State* ls)
     return ls->Error();
 }
 
-int32_t lua::stdlib::base::Warn(State* ls)
-{
-    return outStream(ls, ls->Err(), " ");
-}
+//int32_t lua::stdlib::base::Warn(State* ls)
+//{
+//    return outStream(ls, ls->Err(), " ");
+//}
 
 int32_t lua::stdlib::base::Select(State* ls)
 {
@@ -212,12 +212,14 @@ int32_t lua::stdlib::base::Load(State* ls)
     if (isStr)
     {
         auto chunkname = ls->OptString(2, chunk);
-        status = ls->Load(chunk, chunkname, mode);
+        status = ls->Load(chunk, std::move(chunkname), mode);
     }
     else
     {
         // TODO loading from a reader function
     }
+    // TODO set env
+
     return loadAux(ls, status, env);
 }
 

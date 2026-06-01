@@ -54,9 +54,24 @@ void lua::Stack::PushN(std::vector<ValuePtr>& vals, int64_t n, size_t start)
     {
         n = nV;
     }
-    for (size_t i = start; i < size_t(n); i++)
+    for (size_t i = 0; i < size_t(n); i++)
     {
-        Push(i < nV ? std::move(vals[i]) : Value::Nil());
+        auto j = i + start;
+        Push(j < nV ? std::move(vals[j]) : Value::Nil());
+    }
+}
+
+void lua::Stack::PushN(const std::vector<ValuePtr>& vals, int64_t n, size_t start)
+{
+    auto nV = vals.size();
+    if (n < 0)
+    {
+        n = nV;
+    }
+    for (size_t i = 0; i < size_t(n); i++)
+    {
+        auto j = i + start;
+        Push(j < nV ? vals[j] : Value::Nil());
     }
 }
 

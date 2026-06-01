@@ -27,9 +27,10 @@ set(LUA_BASE
     ${PROJECT_SOURCE_DIR}/base/LuaLexerBase.cpp
     ${PROJECT_SOURCE_DIR}/base/LuaParserBase.h
     ${PROJECT_SOURCE_DIR}/base/LuaParserBase.cpp
-    ${PROJECT_SOURCE_DIR}/base/LuaParserBase.cpp
     ${PROJECT_SOURCE_DIR}/base/LuaRuleContext.cpp
-    ${PROJECT_SOURCE_DIR}/base/LuaRuleContext.cpp
+    ${PROJECT_SOURCE_DIR}/base/LuaRuleContext.h
+    ${PROJECT_SOURCE_DIR}/base/ErrorCollector.cpp
+    ${PROJECT_SOURCE_DIR}/base/ErrorCollector.h
 )
 
 # set(ANTLR java -Xmx500M -cp "/usr/local/lib/antlr-4.13.2-complete.jar" org.antlr.v4.Tool)

@@ -30,6 +30,7 @@ struct Stack
     ValuePtr Pop();
 
     void PushN(std::vector<ValuePtr>& vals, int64_t n, size_t start = 0);
+    void PushN(const std::vector<ValuePtr>& vals, int64_t n, size_t start = 0);
     std::vector<ValuePtr> PopN(int64_t n);
     size_t AbsIndex(int64_t idx) const;
     Value Get(int64_t idx) const;

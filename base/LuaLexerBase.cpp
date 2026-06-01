@@ -6,6 +6,7 @@ using namespace lua;
 
 LuaLexerBase::LuaLexerBase(antlr4::CharStream* input) : antlr4::Lexer(input)
 {
+    removeErrorListeners();
     _input = input;
 }
 

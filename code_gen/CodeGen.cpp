@@ -4,7 +4,7 @@
 #include "LuaParser.h"
 
 using namespace lua;
-using namespace lua::number;
+using namespace lua::number;          
 
 std::string lua::CodeGen::Unescape(std::string_view src)
 {
@@ -105,6 +105,10 @@ std::string lua::CodeGen::Unescape(std::string_view src)
                 }
             }
         }
+        else
+        {
+            dst.push_back(src[i]);
+        }
     }
     return dst;
 }
@@ -175,7 +179,7 @@ std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* no
         slot_type idx = -1;
         if (node->getRuleIndex() == LuaParser::RuleExp)
         {
-            switch (node->getAltNumber() - 1)
+            switch (node->getAltNumber())
             {
             case (size_t)LuaRuleContext::Exp::Nil:
                 idx = (slot_type)fi->IndexOfConstant(nullptr);
@@ -189,7 +193,7 @@ std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* no
             case (size_t)LuaRuleContext::Exp::Number_:
             {
                 auto num = static_cast<LuaParser::Number_Context*>(node)->number();
-                switch (num->getAltNumber() - 1)
+                switch (num->getAltNumber())
                 {
                 case (size_t)LuaRuleContext::Number::Int:
                 {
@@ -223,7 +227,7 @@ std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* no
             case (size_t)LuaRuleContext::Exp::String_:
             {
                 auto sn = static_cast<LuaParser::String_Context*>(node)->string();
-                switch (sn->getAltNumber() - 1)
+                switch (sn->getAltNumber())
                 {
                 case (size_t)LuaRuleContext::String::Normalstring:
                 {
@@ -257,6 +261,13 @@ std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* no
             }
         }
     }
+
+    if (node->getAltNumber() == (size_t)LuaRuleContext::Exp::Prefixexp_)
+    {
+        auto pre = static_cast<LuaParser::Prefixexp_Context*>(node)->prefixexp();
+        return PrefixToOpArg(pre, argKinds);
+    }
+
     auto a = fi->AllocReg();
     VisitWithPara(a, 1, node);
     return {a, Arg::REG};
@@ -318,6 +329,36 @@ slot_type lua::CodeGen::ConstantToOpArg(const any_type& cv)
     return a;
 }
 
+std::pair<slot_type, uint8_t> lua::CodeGen::PrefixToOpArg(LuaParser::PrefixexpContext* node, uint8_t argKinds)
+{
+    switch (node->getAltNumber())
+    {
+    case (size_t)LuaRuleContext::Prefixexp::Nameindex:
+    {
+        auto ni = static_cast<LuaParser::NameindexContext*>(node);
+        if (ni->member().empty())
+        {
+            return NameToOpArg(ni->NAME()->getText(), argKinds);
+        }
+    }
+    break;
+    case (size_t)LuaRuleContext::Prefixexp::Expindex:
+    {
+        auto ei = static_cast<LuaParser::ExpindexContext*>(node);
+        if (ei->member().empty())
+        {
+            return ExpToOpArg(ei->exp(), argKinds);
+        }
+    }
+    break;
+    default:
+        break;
+    }
+    auto a = fi->AllocReg();
+    VisitWithPara(a, 1, node);
+    return {a, Arg::REG};
+}
+
 slot_type lua::CodeGen::VisitMember(LuaParser::MemberContext* member)
 {
     auto an = member->getAltNumber();
@@ -335,26 +376,31 @@ slot_type lua::CodeGen::VisitMember(LuaParser::MemberContext* member)
     return p.first;
 }
 
-void lua::CodeGen::Generate(const std::string& data, Prototype& proto)
+TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
 {
     antlr4::ANTLRInputStream input(data);
     LuaLexer lexer(&input);
+    lexer.addErrorListener(&proto.ec);
     antlr4::CommonTokenStream tokens(&lexer);
     LuaParser parser(&tokens);
-    if (parser.getNumberOfSyntaxErrors() > 0)
+    parser.addErrorListener(&proto.ec);
+    auto chunk = parser.chunk();
+    // if (parser.getNumberOfSyntaxErrors() > 0)
+    //{
+    //     std::cout << "lua file syntax error" << std::endl;
+    // }
+    
+    if (auto& errs = proto.ec.getErrors(); !errs.empty())
     {
-        std::cout << "lua file syntax error" << std::endl;
-    }
-    for (auto t : tokens.getTokens())
-    {
-        std::cout << t->toString() << std::endl;
+        return TStatus::ERRSYNTAX;
     }
 
-    auto chunk = parser.chunk();
-    Generate(chunk, proto);
+    GenerateProto(chunk, proto);
+
+    return TStatus::OK;
 }
 
-void lua::CodeGen::Generate(LuaParser::ChunkContext* ck, Prototype& proto)
+void lua::CodeGen::GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto)
 {
     root = std::make_unique<FuncInfo>();
     root->AddLocVar(str::ENV, 0);
@@ -371,6 +417,7 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
     if (self)
     {
         subFi.AddLocVar("self", 0);
+        ++subFi.numParams;
     }
     auto plist = ctx->parlist();
     auto an = plist->getAltNumber();
@@ -384,7 +431,7 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
             subFi.AddLocVar(nn->getText(), 0);
         }
         subFi.isVararg = nplist->DDD();
-        subFi.numParams = (uint32_t)names.size();
+        subFi.numParams += (uint32_t)names.size();
     }
 
     fi = &subFi;
@@ -611,14 +658,16 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
             auto indexTable = static_cast<LuaParser::IndextableContext*>(vars[i]);
             tRegs[i] = fi->AllocReg();
             VisitWithPara(tRegs[i], 1, indexTable->prefixexp());
-            kRegs[i] = fi->AllocReg();
-            VisitWithPara(kRegs[i], 1, indexTable->member());
+            // kRegs[i] = fi->AllocReg();
+            // VisitWithPara(kRegs[i], 1, indexTable->member());
+            kRegs[i] = VisitMember(indexTable->member());
         }
     }
 
     std::vector<slot_type> vRegs(nVars);
     for (size_t i = 0; i < nVars; i++)
     {
+        // TODO constant v
         vRegs[i] = fi->usedRegs + (slot_type)i;
     }
     if (nExps >= nVars)
@@ -674,7 +723,7 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
             {
                 slot_type g = fi->SlotOfLocVar(str::ENV);
                 bool up = g < 0;
-                if (!up)
+                if (up)
                 {
                     g = (slot_type)fi->IndexOfUpval(str::ENV);
                 }
@@ -793,7 +842,16 @@ std::any lua::CodeGen::visitIf(LuaParser::IfContext* ctx)
         }
         auto exp = exps[i];
         auto oldRegs = fi->usedRegs;
-        auto a = exp ? ExpToOpArg(exp, Arg::REG).first : ConstantToOpArg(true);
+        slot_type a;
+        if (exp)
+        {
+            a=  ExpToOpArg(exp, Arg::REG).first;
+        }
+        else
+        {
+            a = fi->AllocReg();
+            fi->EmitLoadBool(a, 1, 0);
+        }
         fi->usedRegs = oldRegs;
         fi->EmitTest(a, 0);
         pcJmpToNextExp = fi->EmitJmp(0, 0);
@@ -821,7 +879,17 @@ std::any lua::CodeGen::visitFornumerical(LuaParser::FornumericalContext* ctx)
     static const std::string forStepVar = "(for step)";
 
     fi->EnterScope(true);
-    DoVarDecl(ctx->exp(), {forIndexVar, forLimitVar, forStepVar});
+    auto exps = ctx->exp();
+    if (exps.size() < 3)
+    {
+        DoVarDecl(exps, {forIndexVar, forLimitVar});
+        auto a = fi->AddLocVar(forStepVar, fi->PC());
+        fi->EmitLoadK(a, 1);
+    }
+    else
+    {
+        DoVarDecl(exps, {forIndexVar, forLimitVar, forStepVar});
+    }
     fi->AddLocVar(ctx->NAME()->getText(), fi->PC() + 1);
 
     auto a = fi->usedRegs - 4;
@@ -875,24 +943,72 @@ std::any lua::CodeGen::visitFuncnamedef(LuaParser::FuncnamedefContext* ctx)
 {
     auto fname = ctx->funcname();
     auto names = fname->NAME();
-    auto a = fi->AllocReg();
+    auto nsz = names.size();
+    auto oldRegs = fi->usedRegs;
+    std::pair<slot_type, uint8_t> a;
+    slot_type k = 0;
     bool self{};
-    if (names.size() > 1)
+    if (1 == nsz)
     {
-        self = fname->COL();
-        PrepFuncName(a, names.rbegin(), names.rend() - 1);
+        auto name = names.front()->getText();
+        if (fi->SlotOfLocVar(name) < 0 && fi->IndexOfUpval(name) < 0)  // global
+        {
+            k = -1;
+            if (fi->IndexOfConstant(std::move(name)) > 0xff)
+            {
+                k = fi->AllocReg();
+            }
+        }
     }
     else
     {
-        VisitNAME(names.front()->getText(), a);
+        self = fname->COL();
+        if (2 == nsz)
+        {
+            a = NameToOpArg(names.front()->getText(), Arg::RU);
+        }
+        else
+        {
+            a = {fi->AllocReg(), Arg::REG};
+            PrepFuncName(a.first, names.rbegin() + 1, names.rend() - 1);
+        }
+        k = ConstantToOpArg(names.back()->getText());
     }
-
+    auto v = fi->AllocReg();
     auto old_a = _a;
-    _a = a;
+    _a = v;
     DoVisitFuncbody(ctx->funcbody(), self);
     _a = old_a;
-    fi->FreeReg();
 
+    if (1 == nsz)
+    {
+        auto varName = names.back()->getText();
+        if (auto a = fi->SlotOfLocVar(varName); a >= 0)
+        {
+            fi->EmitMove(a, v);
+        }
+        else if (auto b = (slot_type)fi->IndexOfUpval(varName); b >= 0)
+        {
+            fi->EmitSetUpval(v, b);
+        }
+        else
+        {
+            slot_type g = fi->SlotOfLocVar(str::ENV);
+            bool up = g < 0;
+            if (up)
+            {
+                g = (slot_type)fi->IndexOfUpval(str::ENV);
+            }
+            auto c = (slot_type)(k < 0 ? 0x100 + fi->IndexOfConstant(varName) : k);
+            up ? fi->EmitSetTabUp(g, c, v) : fi->EmitSetTable(g, c, v);
+        }
+    }
+    else
+    {
+        a.second == Arg::UPVAL ? fi->EmitSetTabUp(a.first, k, v) : fi->EmitSetTable(a.first, k, v);
+    }
+
+    fi->usedRegs = oldRegs;
     return std::any();
 }
 
@@ -951,7 +1067,46 @@ std::vector<LuaRuleContext*> lua::CodeGen::GetArgs(LuaParser::ArgsContext* args)
 slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, slot_type a, part_iterator start,
                                         part_iterator end, mem_iterator start_m, mem_iterator end_m)
 {
-    if (start_m == end_m)
+    auto next = std::next(start_m);
+    std::pair<slot_type, uint8_t> p;
+    auto oldRegs = fi->usedRegs;
+    if (next == end_m)
+    {
+        // table args 
+        auto k = Arg::RU;
+        if (start != end)
+        {
+            p = {fi->AllocReg(), Arg::REG};
+            auto nArgs = PrepFuncCall(node, p.first, start, end);
+            fi->EmitCall(p.first, nArgs, 1);
+        }
+        else if (auto name = node->NAME())
+        {
+            p = NameToOpArg(name->getText(), k);
+        }
+        else
+        {
+            p = ExpToOpArg(node->exp(), k);
+        }
+    }
+    else
+    {
+        p = {fi->AllocReg(), Arg::REG};
+        PrepMemFuncCall(node, p.first, start, end, next, end_m);
+    }
+
+    auto member = *start_m;
+    auto c = VisitMember(member);
+    fi->usedRegs = oldRegs;
+    Arg::UPVAL == p.second ? fi->EmitGetTabUp(a, p.first, c) : fi->EmitGetTable(a, p.first, c);
+
+    return slot_type();
+}
+
+slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, slot_type a, part_iterator start,
+                                        part_iterator end, MemberContexts& mems)
+{
+    if (mems.empty())
     {
         // no member, call with a
         if (start != end)
@@ -967,25 +1122,8 @@ slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, sl
         {
             VisitWithPara(a, 1, node->exp());
         }
+        return {};
     }
-    else
-    {
-        auto oldRegs = fi->usedRegs;
-        auto r = fi->AllocReg();
-        PrepMemFuncCall(node, r, start, end, std::next(start_m), end_m);
-
-        auto member = *start_m;
-        auto c = VisitMember(member);
-        fi->usedRegs = oldRegs;
-        fi->EmitGetTable(a, r, c);
-    }
-
-    return slot_type();
-}
-
-slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, slot_type a, part_iterator start,
-                                        part_iterator end, MemberContexts& mems)
-{
     return PrepMemFuncCall(node, a, start, end, mems.rbegin(), mems.rend());
 }
 
@@ -1006,12 +1144,8 @@ slot_type lua::CodeGen::PrepFuncCall(LuaParser::FunctioncallContext* node, slot_
         auto name = nameArg->NAME();
         argsN = nameArg->args();
         fi->AllocReg();
-        auto [c, k] = NameToOpArg(name->getText(), Arg::RK);
+        auto c = ConstantToOpArg(name->getText());
         fi->EmitSelf(a, a, c);
-        if (Arg::REG == k)
-        {
-            fi->FreeRegs(1);
-        }
     }
     else
     {
@@ -1111,9 +1245,16 @@ void lua::CodeGen::PrepPrefix(LuaParser::PrefixexpContext* pre, slot_type a, slo
             VisitNAME(name->getText(), a);
         }
         break;
+        case 2:
+        {
+            auto fc = static_cast<LuaParser::CallindexContext*>(pre)->functioncall();
+            VisitWithPara(a, n, fc);
+        }
+        break;
         default:
         {
-            VisitWithPara(a, n, pre);
+            auto exp = static_cast<LuaParser::ExpindexContext*>(pre)->exp();
+            VisitWithPara(a, n, exp);
         }
         break;
         }
@@ -1288,13 +1429,15 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
     if (!fl)
     {
         fi->EmitNewTable(a, 0, 0);
+        return {};
     }
     auto fields = fl->field();
-    auto nArr = std::count_if(fields.begin(), fields.end(), [](auto n) { return n->getAltNumber() < 3; });
+    auto nArr = std::count_if(fields.begin(), fields.end(), [](auto n) { return n->getAltNumber() == 3; });
     auto last = fields.back();
     auto multRet =
         last->getAltNumber() == 3 && IsVarargOrFuncCall(static_cast<LuaParser::ExpfieldContext*>(last)->exp());
     auto nExps = fields.size();
+    fi->EmitNewTable(a, (slot_type)nArr, slot_type(nExps - nArr));
 
     size_t arrIdx{};
     for (size_t i = 0; i < nExps; i++)
@@ -1304,7 +1447,7 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
         if (an == 3)
         {
             ++arrIdx;
-            auto valExp = static_cast<LuaParser::ExpfieldContext*>(last)->exp();
+            auto valExp = static_cast<LuaParser::ExpfieldContext*>(fields[i])->exp();
             auto tmp = fi->AllocReg();
             auto lastMult = i + 1 == nExps && multRet;
             VisitWithPara(tmp, lastMult ? -1 : 1, valExp);
@@ -1320,25 +1463,25 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
             }
             continue;
         }
-
         LuaParser::ExpContext* valExp{};
-        slot_type b = fi->AllocReg();
+        slot_type b = -1;
+        auto old = fi->usedRegs;
         if (an == 1)
         {
-            auto ifd = static_cast<LuaParser::IndexedfieldContext*>(last);
+            auto ifd = static_cast<LuaParser::IndexedfieldContext*>(fields[i]);
             auto exps = ifd->exp();
             valExp = exps.back();
-            VisitWithPara(b, 1, exps.front());
+            b = ExpToOpArg(exps.front(), Arg::RK).first;
         }
         else
         {
-            auto nfd = static_cast<LuaParser::NamedfieldContext*>(last);
+            auto nfd = static_cast<LuaParser::NamedfieldContext*>(fields[i]);
             valExp = nfd->exp();
-            fi->EmitLoadK(b, nfd->NAME()->getText());
+            b = ConstantToOpArg(nfd->NAME()->getText());
         }
-        slot_type c = fi->AllocReg();
-        VisitWithPara(c, 1, valExp);
-        fi->FreeRegs(2);
+
+        slot_type c = ExpToOpArg(valExp, Arg::RK).first;
+        fi->usedRegs = old;
         fi->EmitSetTable(a, b, c);
     }
 

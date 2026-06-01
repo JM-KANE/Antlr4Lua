@@ -8,6 +8,7 @@ using namespace lua;
 
 LuaParserBase::LuaParserBase(antlr4::TokenStream* input) : Parser(input)
 {
+    removeErrorListeners();
 }
 
 bool LuaParserBase::IsFunctionCall()

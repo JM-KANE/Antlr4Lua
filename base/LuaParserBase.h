@@ -4,7 +4,7 @@
 #ifndef _LUA_PARSER_BASE_H
 #define _LUA_PARSER_BASE_H
 
-#include "antlr4-runtime.h"
+#include "ErrorCollector.h"
 
 namespace lua
 {

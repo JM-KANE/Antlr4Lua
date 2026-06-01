@@ -11,7 +11,7 @@ class LuaRuleContext : public antlr4::ParserRuleContext
 public:
     enum class Stat
     {
-        Semistat,
+        Semistat = 1,
         Assign,
         Functioncall_,
         Label_,
@@ -29,7 +29,7 @@ public:
     };
     enum class Exp
     {
-        Nil,
+        Nil = 1,
         False,
         True,
         Number_,
@@ -50,64 +50,66 @@ public:
     };
     enum class Var
     {
-        Normalvar,
+        Normalvar = 1,
         Indextable
     };
     enum class Prefixexp
     {
-        Nameindex,
+        Nameindex = 1,
         Callindex,
         Expindex
     };
     enum class Member
     {
-        Index,
+        Index = 1,
         Access
     };
     enum class Args
     {
-        Normalarg,
+        Normalarg = 1,
         Tablearg,
         Stringarg
     };
     enum class Parlist
     {
-        Nameparlist,
+        Nameparlist = 1,
         Varparlist,
         Emptyparlist
     };
     enum class Field
     {
-        Indexedfield,
+        Indexedfield = 1,
         Namedfield,
         Expfield
     };
     enum class Fieldsep
     {
-        Semi,
+        Semi = 1,
         Colon
     };
     enum class Number
     {
-        Int,
+        Int = 1,
         Hex,
         Float,
         Hexfloat
     };
     enum class String
     {
-        Normalstring,
+        Normalstring = 1,
         Charstring,
         Longstring
     };
     enum class Functionargs
     {
-        Args_,
+        Args_ = 1,
         Nameargs
     };
 
 private:
     mutable size_t _altNum = antlr4::atn::ATN::INVALID_ALT_NUMBER;
+
+    void FixAltNum() const;
 
 public:
     using antlr4::ParserRuleContext::ParserRuleContext;

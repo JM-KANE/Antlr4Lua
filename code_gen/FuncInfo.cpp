@@ -443,13 +443,6 @@ void lua::FuncInfo::EmitConcat(slot_type a, slot_type b, slot_type c)
     EmitABC(Op::CONCAT, a, b, c);
 }
 
-Prototype lua::FuncInfo::ToProto()
-{
-    Prototype proto;
-    ToProto(proto);
-    return proto;
-}
-
 void lua::FuncInfo::ToProto(Prototype& proto)
 {
     proto.LineDefined = line;
@@ -459,7 +452,7 @@ void lua::FuncInfo::ToProto(Prototype& proto)
     proto.Code = std::move(insts);
     GetConstants(proto.Constants);
     GetUpvalues(proto.Upvalues);
-    ToSubProtos(proto.Protos);
+    ToSubProtos(proto);
     proto.LineInfo = std::move(lineNums);
     GetLocVars(proto.LocVars);
     GetUpvalueNames(proto.UpvalueNames);
@@ -522,11 +515,13 @@ void lua::FuncInfo::GetLocVars(std::vector<Prototype::LocVar>& v)
     }
 }
 
-void lua::FuncInfo::ToSubProtos(std::vector<Prototype>& v)
+void lua::FuncInfo::ToSubProtos(Prototype& p)
 {
+    auto v = p.Protos;
     v.reserve(subFuncs.size());
     for (auto&& fi : subFuncs)
     {
-        v.emplace_back(fi->ToProto());
+        fi->ToProto(v.emplace_back());
+        v.back().Parent = &p;
     }
 }

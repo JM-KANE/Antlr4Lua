@@ -141,7 +141,7 @@ void lua::Table::InitKeys()
     changed = 0;
     for (size_t i = 0; i < arr.size(); i++)
     {
-        keys[(int64_t)i] = arr[i]->index() ? arr[i].get() : nullptr;
+        keys[int64_t(i + 1)] = arr[i]->index() ? arr[i].get() : nullptr;
     }
     for (auto&& [k, v] : map)
     {
@@ -154,7 +154,7 @@ void lua::Table::InitKeys()
 
     using iterator = decltype(keys)::iterator;
 
-    std::pair<iterator, iterator> befores;
+    std::pair<iterator, iterator> befores{keys.end(), keys.end()};
     const Value* first{};
     for (auto it = keys.begin(); it != keys.end(); ++it)
     {
@@ -165,12 +165,14 @@ void lua::Table::InitKeys()
             {
                 first = curr;
             }
-            auto end = std::next(befores.second);
-            for (auto it = befores.first; it != end; ++it)
+            if (befores.first != keys.end())
             {
-                it->second = curr;
+                auto end = std::next(befores.second);
+                for (auto it = befores.first; it != end; ++it)
+                {
+                    it->second = curr;
+                }
             }
-
             befores.first = it;
         }
         befores.second = it;
@@ -182,13 +184,13 @@ void lua::Table::InitKeys()
     else
     {
         auto next = std::next(befores.first);
-        auto n = keys.extract(befores.first);
+        befores.first->second = nullptr;
         for (auto it = next; it != keys.end();)
         {
             it = keys.erase(it);
         }
-        n.mapped() = first;
-        n.key() = nullptr;
+        keys.emplace(nullptr, first);
+
     }
 }
 

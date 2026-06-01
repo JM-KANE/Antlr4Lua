@@ -23,18 +23,6 @@ struct tuple_map<F, std::tuple<Ts...>>
 template <template <typename> class F, typename Tuple>
 using tuple_map_t = tuple_map<F, Tuple>::type;
 
-enum class TStatus : uint8_t
-{
-    OK,
-    YIELD,
-    ERRRUN,
-    ERRSYNTAX,
-    ERRMEM,
-    ERRGCMM,
-    ERRERR,
-    ERRFILE
-};
-
 using namespace std::literals;
 
 }  // namespace lua

@@ -43,9 +43,9 @@ std::ostream& lua::State::Err() const
     return *vm->err;
 }
 
-TStatus lua::State::Load(const std::string& data, const std::string& chunkName, std::string_view mode)
+TStatus lua::State::Load(const std::string& data, std::string chunkName, std::string_view mode)
 {
-    auto& p = vm->proto;
+    auto& p = vm->NewProto();
     if (false)
     {
         // TODO binary chunk
@@ -55,18 +55,13 @@ TStatus lua::State::Load(const std::string& data, const std::string& chunkName, 
         CodeGen cg;
         cg.Generate(data, p);
     }
+    p.Source = std::move(chunkName);
     auto& c = vm->NewLuaClosure(p);
     stack().Push(&c);
     if (!p.Upvalues.empty())
     {
         auto& env = *registry.Get(cv::RIDX_GLOBALS);
         c.upvals.front() = std::make_unique<Upvalue>(env);
-    }
-
-    auto nArgs = vm->argc - 2;
-    for (int64_t i = 0; i < nArgs; i++)
-    {
-        PushString(vm->argv[i + 2]);
     }
     return TStatus::OK;
 }
@@ -261,13 +256,14 @@ void lua::State::LoadVararg(int32_t n)
     if (n < 0)
         n = (int32_t)stack().varargs.size();
     stack().Check(n);
-    stack().PushN(stack().varargs, n);
+    const auto& vars = stack().varargs;
+    stack().PushN(vars, n);
 }
 
 void lua::State::LoadProto(int32_t idx)
 {
     auto& stk = stack();
-    auto subProto = stk.closure->proto->Protos[(size_t)idx];
+    auto& subProto = stk.closure->proto->Protos[(size_t)idx];
     auto& closure = vm->NewLuaClosure(subProto);
     stk.Push(&closure);
     for (size_t i = 0; i < subProto.Upvalues.size(); i++)
@@ -857,7 +853,7 @@ std::string lua::State::ToString2(int32_t idx)
         {
             auto tt = GetMetafield(idx, str::NAME);
             auto kind = type::STRING == tt ? CheckString(-1) : TypeName2(idx);
-            PushString(std::format("{0} {1:p}", kind, ToPointer(idx)));
+            PushString(std::format("{0}: {1:p}", kind, ToPointer(idx)));
             if (type::STRING != tt)
                 Remove(-2);
         }
@@ -1000,7 +996,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c)
     newStack->top = nRegs;  // to max
     if (nArgs > nParams && isVararg)
     {
-        newStack->varargs = std::vector(std::make_move_iterator(funcAndArgs.begin() + nParams),
+        newStack->varargs = std::vector(std::make_move_iterator(funcAndArgs.begin() + nParams + 1),
                                         std::make_move_iterator(funcAndArgs.end()));
     }
 

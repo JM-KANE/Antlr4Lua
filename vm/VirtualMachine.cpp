@@ -232,8 +232,19 @@ lua::VirtualMachine::VirtualMachine(int _argc, const char** _argv)
 void lua::VirtualMachine::Run()
 {
     main.OpenLibs();
-    main.LoadFile(argv[1]);
+    auto res =  main.LoadFile(argv[1]);
+    auto nArgs = argc - 2;
+    for (int64_t i = 0; i < nArgs; i++)
+    {
+        main.PushString(argv[i + 2]);
+    }
+
     main.Call((int32_t)argc - 2, -1);
+}
+
+TopPrototype& lua::VirtualMachine::NewProto()
+{
+    return *topProtos.emplace_back(std::make_unique<TopPrototype>());
 }
 
 Closure& lua::VirtualMachine::NewLuaClosure(const Prototype& p)

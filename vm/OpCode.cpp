@@ -304,7 +304,7 @@ void PopResults(int32_t a, int32_t c, State* ls)
     {
         for (auto i = a + c - 2; i >= a; --i)
         {
-            ls->Replace(a);
+            ls->Replace(i);
         }
     }
     else if (c != 1)
@@ -442,7 +442,7 @@ void setList(Instruction i, State* ls)
     }
     if (isZero)
     {
-        for (int32_t j = ls->RegisterCount(); j < ls->GetTop(); j++)
+        for (int32_t j = ls->RegisterCount() + 1; j <= ls->GetTop(); j++)
         {
             ++idx;
             ls->PushValue(j);
