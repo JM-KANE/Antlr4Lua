@@ -110,12 +110,17 @@ private:
     mutable size_t _altNum = antlr4::atn::ATN::INVALID_ALT_NUMBER;
 
     void FixAltNum() const;
+    antlr4::Token* FindFirstNonNullStart() const;
+    antlr4::Token* FindFirstNonNullStop() const;
 
 public:
     using antlr4::ParserRuleContext::ParserRuleContext;
 
     size_t getAltNumber() const override;
     void setAltNumber(size_t altNumber) override;
+
+    uint32_t Line() const;
+    uint32_t LastLine() const;
 };
 
 }  // namespace lua

@@ -19,6 +19,12 @@
       }     
     },
     {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "inherits": "linux-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
       "name": "windows-base",
       "hidden": true,
       "generator": "Ninja",
@@ -51,6 +57,34 @@
       "displayName": "x64 Release",
       "inherits": "x64-debug",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "base-build",
+      "jobs": 4,
+      "verbose": false,
+      "hidden": true
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "base-build",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-release",
+      "inherits": "base-build",
+      "configurePreset": "linux-release"
+    },
+    {
+      "name": "x64-debug",
+      "inherits": "base-build",
+      "configurePreset": "x64-debug"
+    },
+    {
+      "name": "x64-release",
+      "inherits": "base-build",
+      "configurePreset": "x64-release"
     }
   ]
 }

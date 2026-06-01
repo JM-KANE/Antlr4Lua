@@ -1,2 +1,2 @@
-cmake -H. -B build -D debug=ON
-cmake --build build --parallel 4
+cmake --preset linux-release
+cmake --build --preset linux-release

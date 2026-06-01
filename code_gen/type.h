@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
+#include <stdint.h>
 
 namespace lua
 {
@@ -40,7 +41,6 @@ template <typename T>
 using string_ref_map = ref_map<const std::string, T>;
 
 using any_type = std::variant<std::nullptr_t, bool, int64_t, double, std::string>;
-
 
 enum class TStatus : uint8_t
 {

@@ -80,7 +80,10 @@ int32_t loadAux(State* ls, TStatus status, int32_t envIdx)
     else
     {
         ls->PushNil();
-        ls->Insert(-2);
+        std::ostringstream os;
+        ls->Catch(os);
+        ls->PushString(os.str());
+        // ls->Insert(-2);
         return 2;
     }
 }
@@ -95,8 +98,8 @@ int32_t lua::stdlib::OpenBaseLib(State* ls)
     ls->SetField(-2, "_G");
     ls->PushString("Lua 5.3");
     ls->SetField(-2, "_VERSION");
-    //ls->PushAny(ls->GetArgs());
-    //ls->SetField(-2, "arg");
+    // ls->PushAny(ls->GetArgs());
+    // ls->SetField(-2, "arg");
     return 1;
 }
 
@@ -120,19 +123,14 @@ int32_t lua::stdlib::base::Error(State* ls)
 {
     auto level = int32_t(ls->OptInteger(2, 1));
     ls->SetTop(1);
-    if (ls->Type(1) == type::STRING && level > 0)
-    {
-        // ls->Where(level) /* add extra information */
-        // ls->PushValue(1)
-        // ls->Concat(2)
-    }
+    ls->PushInteger(level);
     return ls->Error();
 }
 
-//int32_t lua::stdlib::base::Warn(State* ls)
+// int32_t lua::stdlib::base::Warn(State* ls)
 //{
-//    return outStream(ls, ls->Err(), " ");
-//}
+//     return outStream(ls, ls->Err(), " ");
+// }
 
 int32_t lua::stdlib::base::Select(State* ls)
 {
@@ -218,7 +216,6 @@ int32_t lua::stdlib::base::Load(State* ls)
     {
         // TODO loading from a reader function
     }
-    // TODO set env
 
     return loadAux(ls, status, env);
 }
@@ -242,7 +239,7 @@ int32_t lua::stdlib::base::DoFile(State* ls)
     ls->SetTop(1);
     if (ls->LoadFile(fname) != TStatus::OK)
     {
-        return ls->Error();
+        return 0;
     }
     ls->Call(0, cv::RIDX_GLOBALS);
     return (int32_t)ls->GetTop() - 1;
@@ -261,9 +258,7 @@ int32_t lua::stdlib::base::XPCall(State* ls)
 {
     auto nArgs = ls->GetTop() - 2;
     ls->Rotate(2, -1);
-    auto i = (int32_t)ls->CheckInteger(-1);  // TODO
-    ls->Pop(1);
-    auto status = ls->PCall((int32_t)nArgs, -1, i);
+    auto status = ls->PCall((int32_t)nArgs, -1, 1);
     ls->PushBoolean(status == TStatus::OK);
     ls->Insert(1);
     return (int32_t)ls->GetTop();

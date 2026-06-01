@@ -11,6 +11,8 @@ struct SyntaxError
     size_t charPositionInLine;
     std::string msg;
     antlr4::Token* offendingSymbol;
+
+    std::string Msg() const;
 };
 
 class ErrorCollector : public antlr4::BaseErrorListener
@@ -19,15 +21,15 @@ public:
     void syntaxError(antlr4::Recognizer* recognizer, antlr4::Token* offendingSymbol, size_t line,
                      size_t charPositionInLine, const std::string& msg, std::exception_ptr e) override;
 
-    const std::vector<SyntaxError>& getErrors() const
+    std::vector<SyntaxError>& GetErrors()
     {
         return errors_;
     }
-    bool hasErrors() const
+    bool HasErrors() const
     {
         return !errors_.empty();
     }
-    void clear()
+    void Clear()
     {
         errors_.clear();
     }

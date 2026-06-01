@@ -46,6 +46,7 @@ std::ostream& lua::State::Err() const
 TStatus lua::State::Load(const std::string& data, std::string chunkName, std::string_view mode)
 {
     auto& p = vm->NewProto();
+    TStatus st{};
     if (false)
     {
         // TODO binary chunk
@@ -53,8 +54,17 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
     else
     {
         CodeGen cg;
-        cg.Generate(data, p);
+        st = cg.Generate(data, p);
     }
+    if (st != TStatus{})
+    {
+        if (TStatus::ERRSYNTAX == st)
+        {
+            MakeError<SyntaxException>(&p, std::move(p.ec.GetErrors().front()));
+        }
+        return st;
+    }
+
     p.Source = std::move(chunkName);
     auto& c = vm->NewLuaClosure(p);
     stack().Push(&c);
@@ -63,7 +73,7 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
         auto& env = *registry.Get(cv::RIDX_GLOBALS);
         c.upvals.front() = std::make_unique<Upvalue>(env);
     }
-    return TStatus::OK;
+    return st;
 }
 
 TStatus lua::State::LoadFile(std::string_view filename)
@@ -79,6 +89,7 @@ TStatus lua::State::LoadFileX(std::string_view filename, std::string_view mode)
         std::string data((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
         return Load(data, "@" + std::string(filename), mode);
     }
+    MakeError<FileException>(std::string(filename));
     return TStatus::ERRFILE;
 }
 
@@ -174,6 +185,54 @@ std::unique_ptr<Stack> lua::State::PopLuaStack()
     stk->prev = {};
     stacks.pop_back();
     return stk;
+}
+
+std::pair<uint32_t, bool> lua::State::CurrentLine(uint32_t level) const
+{
+    if (level)
+        return {};
+
+    auto stk = &stack();
+    size_t i = 1;
+    for (; i < level && stk->prev; i++)
+    {
+        stk = stk->prev;
+    }
+    if (i < level)
+        return {};
+
+    return {stk->CurrentLine(), true};
+}
+
+std::pair<uint32_t, const TopPrototype*> lua::State::Where(uint32_t level) const
+{
+    if (level)
+        return {};
+    auto stk = &stack();
+    const Prototype* proto{};
+    uint32_t line{};
+    size_t i = 0;
+    while (1)
+    {
+        if (auto protoC = stk->closure->proto)
+        {
+            ++i;
+            if (i == level)
+            {
+                proto = protoC;
+                line = stk->CurrentLine();
+                break;
+            }
+        }
+        if (auto prev = stk->prev)
+        {
+            stk = prev;
+            continue;
+        }
+        else
+            break;
+    }
+    return {line, proto->Top()};
 }
 
 uint32_t lua::State::Fetch() const
@@ -501,25 +560,37 @@ void lua::State::Call(int32_t nArgs, int32_t nRes)
 TStatus lua::State::PCall(int32_t nArgs, int32_t nRes, int32_t msgh)
 {
     auto& caller = stack();
-    auto status = TStatus::ERRRUN;
-    try
+    auto c = msgh ? stack().Pop() : nullptr;
+    Call(nArgs, nRes);
+    std::ostringstream os;
+    auto st = Catch(os);
+    if (st != TStatus::OK)
     {
-        Call(nArgs, nRes);
-        status = TStatus::OK;
-    }
-    catch (const std::exception& e)
-    {
+        // while (&stack() != &caller)
+        // {
+        //     PopLuaStack();
+        // }
+
+        auto msg = os.str();
         if (msgh)
         {
-            // TODO Get(msg), handle error
+            PushAny(std::move((*c)));
+            Insert(1);
+            SetTop(1);
+            PushString(std::move(msg));
+            Call(1, -1);
+            if (exception && exception->Status() != TStatus::ERRERR)
+            {
+                MakeError<ErrorException>(exception->ToString());
+            }
         }
-        while (&stack() != &caller)
+        else
         {
-            PopLuaStack();
+            SetTop(1);
+            stack().Set(1, std::move(msg));
         }
-        stack().Push(e.what());
     }
-    return status;
+    return st;
 }
 
 bool lua::State::CallMeta(int obj, std::string_view event)
@@ -545,10 +616,37 @@ bool lua::State::RawEqual(int32_t idx1, int32_t idx2)
     return false;
 }
 
+void lua::State::Throw()
+{
+    status = Catch(Err());
+}
+
+TStatus lua::State::Catch(std::ostream& os)
+{
+    if (exception)
+    {
+        auto st = exception->Status();
+        os << *exception << std::endl;
+        exception.reset();
+        return st;
+    }
+    return status;
+}
+
 int32_t lua::State::Error()
 {
-    auto v = stack().Pop();
-    // TODO error
+    if (exception)
+    {
+        return 0;
+    }
+
+    auto lv = (size_t)ToInteger(-1);
+    Pop(1);
+    auto msg = ToString(-1);
+    Pop(1);
+
+    auto [line, proto] = Where(lv);
+    MakeError<RunException>(proto, line, std::move(msg));
     return 0;
 }
 
@@ -882,7 +980,7 @@ void* lua::State::ToPointer(int32_t idx)
             if constexpr (std::is_same_v<T, Table*> || std::is_same_v<T, Closure*> || std::is_same_v<T, State*>)
                 return arg;
             else
-                return &arg;
+                return nullptr;
         },
         val);
 }
@@ -1034,16 +1132,25 @@ void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c)
     }
 }
 
-void lua::State::RunLuaClosure()
+TStatus lua::State::RunLuaClosure()
 {
     while (1)
     {
+        // auto line = CurrentLine();
         Instruction inst = Fetch();
         inst.Execute(this);
+        if (exception)
+        {
+            return exception->Status();
+        }
         CheckGC();
+        if (exception)
+        {
+            return exception->Status();
+        }
         if (inst.Opcode() == Op::RETURN)
         {
-            return;
+            return TStatus::OK;
         }
     }
 }

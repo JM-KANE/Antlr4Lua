@@ -7,6 +7,11 @@ lua::Stack::Stack(size_t size, State* st) : slots(size), state{st}
 {
 }
 
+uint32_t lua::Stack::CurrentLine() const
+{
+    return closure->proto->LineInfo[pc - 1];
+}
+
 void lua::Stack::Check(size_t n)
 {
     auto free = slots.size() - top;

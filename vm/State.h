@@ -2,6 +2,7 @@
 #define _STATE_H
 
 #include "Stack.h"
+#include "../code_gen/LuaException.h"
 namespace lua
 {
 namespace op
@@ -15,6 +16,8 @@ struct State
     VirtualMachine* vm{};
     Table& registry;
     std::vector<std::unique_ptr<Stack>> stacks;
+    std::unique_ptr<Exception> exception;
+    TStatus status{};
 
     State(VirtualMachine* _vm, Table& reg);
     void Mark(std::vector<Value>& grey);
@@ -31,7 +34,7 @@ struct State
     void SetFuncs(const FuncReg<N>& l, size_t nup)
     {
         auto snup = (int32_t)nup;
-        CheckStack2(snup, "too many upvalues");
+        // CheckStack2(snup, "too many upvalues");
         for (auto&& [name, fun] : l)
         {
             for (size_t i = 0; i < nup; i++)
@@ -76,7 +79,8 @@ struct State
     Stack& PushLuaStack(std::unique_ptr<Stack>&& stk);
     Stack& PushLuaStack(size_t size, State* st);
     std::unique_ptr<Stack> PopLuaStack();
-
+    std::pair<uint32_t, bool> CurrentLine(uint32_t level) const;
+    std::pair<uint32_t, const TopPrototype*> Where(uint32_t level) const;
     uint32_t Fetch() const;
     int32_t AbsIndex(int32_t idx);
 
@@ -191,7 +195,14 @@ struct State
     }
     bool RawEqual(int32_t idx1, int32_t idx2);
 
+    void Throw();
+    TStatus Catch(std::ostream& os);
     int32_t Error();
+    template <typename T, typename... Ts>
+    void MakeError(Ts&&... args)
+    {
+        exception = std::make_unique<T>(std::forward<Ts>(args)...);
+    }
     template <typename... Ts>
     int32_t Error2(const char* fmt, Ts... args)
     {
@@ -208,6 +219,7 @@ struct State
         }
 
         PushString(std::move(msg));
+        PushInteger(1);
         return Error();
     }
 
@@ -259,7 +271,7 @@ struct State
     std::pair<ValuePtr, bool> CallMetamethod(Value a, Value b, const char* mmName);
     void CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c);
     void CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c);
-    void RunLuaClosure();
+    TStatus RunLuaClosure();
     uint8_t GetTable(const Value& t, const Value& k, bool raw);
     void SetTable(const Value& t, const Value& k, Value v, bool raw);
 

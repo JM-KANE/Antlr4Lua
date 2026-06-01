@@ -4,7 +4,7 @@
 #include "LuaParser.h"
 
 using namespace lua;
-using namespace lua::number;          
+using namespace lua::number;
 
 std::string lua::CodeGen::Unescape(std::string_view src)
 {
@@ -128,6 +128,11 @@ void lua::CodeGen::VisitWithPara(slot_type a, slot_type n, LuaRuleContext* ctx)
     _n = n;
     ctx->accept(this);
     SetPara(p);
+}
+
+uint32_t lua::CodeGen::Line(antlr4::tree::TerminalNode* ctx)
+{
+    return ctx->getSymbol()->getLine();
 }
 
 bool lua::CodeGen::IsVarargOrFuncCall(LuaRuleContext* exp)
@@ -281,7 +286,7 @@ std::pair<slot_type, slot_type> lua::CodeGen::ExpToOpArg(const std::vector<LuaPa
     return {b, c};
 }
 
-std::pair<slot_type, uint8_t> lua::CodeGen::NameToOpArg(const std::string& name, uint8_t argKinds)
+std::pair<slot_type, uint8_t> lua::CodeGen::NameToOpArg(const std::string& name, uint8_t argKinds, uint32_t line)
 {
     if (argKinds & Arg::REG)
     {
@@ -299,11 +304,16 @@ std::pair<slot_type, uint8_t> lua::CodeGen::NameToOpArg(const std::string& name,
     }
 
     auto a = fi->AllocReg();
-    VisitNAME(name, a);
+    VisitNAME(name, a, line);
     return {a, Arg::REG};
 }
 
-slot_type lua::CodeGen::ConstantToOpArg(const any_type& cv)
+std::pair<slot_type, uint8_t> lua::CodeGen::NameToOpArg(antlr4::tree::TerminalNode* name, uint8_t argKinds)
+{
+    return NameToOpArg(name->getText(), argKinds, name->getSymbol()->getLine());
+}
+
+slot_type lua::CodeGen::ConstantToOpArg(const any_type& cv, uint32_t line)
 {
     auto idx = fi->IndexOfConstant(cv);
     if (idx <= 0xff)
@@ -316,13 +326,13 @@ slot_type lua::CodeGen::ConstantToOpArg(const any_type& cv)
     switch (cv.index())
     {
     case 0:
-        fi->EmitLoadNil(a, 1);
+        fi->EmitLoadNil(line, a, 1);
         break;
     case 1:
-        fi->EmitLoadBool(a, std::get<bool>(cv), 0);
+        fi->EmitLoadBool(line, a, std::get<bool>(cv), 0);
         break;
     default:
-        fi->EmitLoadK(a, cv);
+        fi->EmitLoadK(line, a, cv);
         break;
     }
 
@@ -338,7 +348,8 @@ std::pair<slot_type, uint8_t> lua::CodeGen::PrefixToOpArg(LuaParser::PrefixexpCo
         auto ni = static_cast<LuaParser::NameindexContext*>(node);
         if (ni->member().empty())
         {
-            return NameToOpArg(ni->NAME()->getText(), argKinds);
+            auto name = ni->NAME();
+            return NameToOpArg(name, argKinds);
         }
     }
     break;
@@ -371,7 +382,7 @@ slot_type lua::CodeGen::VisitMember(LuaParser::MemberContext* member)
     else
     {
         auto name = static_cast<LuaParser::AccessContext*>(member)->NAME();
-        p.first = ConstantToOpArg(name->getText());
+        p.first = ConstantToOpArg(name->getText(), member->Line());
     }
     return p.first;
 }
@@ -385,12 +396,7 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     LuaParser parser(&tokens);
     parser.addErrorListener(&proto.ec);
     auto chunk = parser.chunk();
-    // if (parser.getNumberOfSyntaxErrors() > 0)
-    //{
-    //     std::cout << "lua file syntax error" << std::endl;
-    // }
-    
-    if (auto& errs = proto.ec.getErrors(); !errs.empty())
+    if (proto.ec.HasErrors())
     {
         return TStatus::ERRSYNTAX;
     }
@@ -402,7 +408,7 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
 
 void lua::CodeGen::GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto)
 {
-    root = std::make_unique<FuncInfo>();
+    root = std::make_unique<FuncInfo>(ck);
     root->AddLocVar(str::ENV, 0);
     fi = root.get();
     visitChunk(ck);
@@ -412,7 +418,7 @@ void lua::CodeGen::GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& prot
 std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self)
 {
     auto a = _a;
-    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(fi));
+    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(ctx, fi));
 
     if (self)
     {
@@ -438,19 +444,19 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
     visitBlock(ctx->block());
     fi = subFi.parent;
     subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
-    subFi.EmitReturn(0, 0);
-    fi->EmitClosure(a, int32_t(fi->subFuncs.size() - 1));
+    subFi.EmitReturn(ctx->LastLine(), 0, 0);
+    fi->EmitClosure(ctx->LastLine(), a, int32_t(fi->subFuncs.size() - 1));
     return std::any();
 }
 
 std::any lua::CodeGen::visitChunk(LuaParser::ChunkContext* ctx)
 {
-    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(fi));
+    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(ctx, fi));
     fi = &subFi;
     visitBlock(ctx->block());
     fi = subFi.parent;
     subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
-    subFi.EmitReturn(0, 0);
+    subFi.EmitReturn(ctx->LastLine(), 0, 0);
     return std::any();
 }
 
@@ -479,7 +485,7 @@ std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
     auto sz = exps.size();
     if (!sz)
     {
-        fi->EmitReturn(0, 0);
+        fi->EmitReturn(ctx->LastLine(), 0, 0);
         return {};
     }
     if (1 == sz)
@@ -498,7 +504,7 @@ std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
                     auto name = ni->NAME()->getText();
                     if (auto r = fi->SlotOfLocVar(name); r >= 0)
                     {
-                        fi->EmitReturn(r, 1);
+                        fi->EmitReturn(ctx->LastLine(), r, 1);
                         return {};
                     }
                 }
@@ -510,10 +516,11 @@ std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
                 if (fci->member().empty())
                 {
                     auto r = fi->AllocReg();
-                    auto nArgs = PrepFuncCall(fci->functioncall(), r);
-                    fi->EmitTailCall(r, nArgs);
+                    auto fc = fci->functioncall();
+                    auto nArgs = PrepFuncCall(fc, r);
+                    fi->EmitTailCall(fc->Line(), r, nArgs);
                     fi->FreeReg();
-                    fi->EmitReturn(r, -1);
+                    fi->EmitReturn(ctx->LastLine(), r, -1);
                     return {};
                 }
             }
@@ -534,40 +541,13 @@ std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
 
     auto nExps = (slot_type)sz;
     fi->FreeRegs(nExps);
-    fi->EmitReturn(fi->usedRegs, multRet ? -1 : nExps);  // TODO
+    fi->EmitReturn(ctx->LastLine(), fi->usedRegs, multRet ? -1 : nExps);  // TODO
 
     return std::any();
 }
 
-// void lua::CodeGen::visitExp(LuaParser::ExpContext* ctx, slot_type a, slot_type n)
-// {
-//     auto p = GetPara();
-//     _a = a;
-//     _n = n;
-//     switch (ctx->getAltNumber())
-//     {
-//     case size_t(LuaRuleContext::Exp::Nil):
-//         fi->EmitLoadNil(a, n);
-//         break;
-//     case size_t(LuaRuleContext::Exp::False):
-//         fi->EmitLoadBool(a, 0, 0);
-//         break;
-//     case size_t(LuaRuleContext::Exp::True):
-//         fi->EmitLoadBool(a, 1, 0);
-//         break;
-//     case size_t(LuaRuleContext::Exp::Varargexp):
-//         visitVarargexp(static_cast<LuaParser::VarargexpContext*>(ctx));
-//         break;
-
-//     default:
-//         visitChildren(ctx);
-//         break;
-//     }
-
-//     SetPara(p);
-// }
-
-void lua::CodeGen::DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names)
+void lua::CodeGen::DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names,
+                             uint32_t line)
 {
     auto nExps = exps.size();
     auto nNames = names.size();
@@ -611,7 +591,7 @@ void lua::CodeGen::DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, st
         if (!multRet)
         {
             auto a = fi->AllocRegs(n);
-            fi->EmitLoadNil(a, n);
+            fi->EmitLoadNil(line, a, n);
         }
     }
     fi->usedRegs = oldRegs;
@@ -702,7 +682,7 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
         if (!multRet)
         {
             auto a = fi->AllocRegs(n);
-            fi->EmitLoadNil(a, n);
+            fi->EmitLoadNil(ctx->Line(), a, n);
         }
     }
     for (size_t i = 0; i < nVars; i++)
@@ -713,11 +693,11 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
             auto varName = static_cast<LuaParser::NormalvarContext*>(vars[i])->NAME()->getText();
             if (auto a = fi->SlotOfLocVar(varName); a >= 0)
             {
-                fi->EmitMove(a, vRegs[i]);
+                fi->EmitMove(ctx->Line(), a, vRegs[i]);
             }
             else if (auto b = fi->IndexOfUpval(varName); b >= 0)
             {
-                fi->EmitSetUpval(vRegs[i], (slot_type)b);
+                fi->EmitSetUpval(ctx->Line(), vRegs[i], (slot_type)b);
             }
             else
             {
@@ -730,17 +710,17 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
                 auto c = kRegs[i] < 0 ? 0x100 + fi->IndexOfConstant(varName) : kRegs[i];
                 if (up)
                 {
-                    fi->EmitSetTabUp(g, (slot_type)c, vRegs[i]);
+                    fi->EmitSetTabUp(ctx->Line(), g, (slot_type)c, vRegs[i]);
                 }
                 else
                 {
-                    fi->EmitSetTable(g, (slot_type)c, vRegs[i]);
+                    fi->EmitSetTable(ctx->Line(), g, (slot_type)c, vRegs[i]);
                 }
             }
         }
         else
         {
-            fi->EmitSetTable(tRegs[i], kRegs[i], vRegs[i]);
+            fi->EmitSetTable(ctx->Line(), tRegs[i], kRegs[i], vRegs[i]);
         }
     }
     fi->usedRegs = oldRegs;  // TODO
@@ -767,7 +747,7 @@ std::any lua::CodeGen::visitLabel(LuaParser::LabelContext* ctx)
 
 std::any lua::CodeGen::visitBreak(LuaParser::BreakContext* ctx)
 {
-    auto pc = fi->EmitJmp(0, 0);
+    auto pc = fi->EmitJmp(ctx->Line(), 0, 0);
     fi->AddBreakJmp(pc);
     return std::any();
 }
@@ -782,7 +762,7 @@ std::any lua::CodeGen::visitDo(LuaParser::DoContext* ctx)
 {
     fi->EnterScope(false);
     visitBlock(ctx->block());
-    fi->CloseOpenUpvals();
+    fi->CloseOpenUpvals(ctx->LastLine());
     fi->ExitScope(fi->PC());
     return std::any();
 }
@@ -791,15 +771,17 @@ std::any lua::CodeGen::visitWhile(LuaParser::WhileContext* ctx)
 {
     auto pcBeforeExp = fi->PC();
     auto oldRegs = fi->usedRegs;
-    auto [a, _] = ExpToOpArg(ctx->exp(), Arg::REG);
+    auto testExp = ctx->exp();
+    auto [a, _] = ExpToOpArg(testExp, Arg::REG);
     fi->usedRegs = oldRegs;
-    fi->EmitTest(a, 0);
-    auto pcJmpToEnd = fi->EmitJmp(0, 0);
+    fi->EmitTest(testExp->Line(), a, 0);
+    auto pcJmpToEnd = fi->EmitJmp(testExp->Line(), 0, 0);
 
     fi->EnterScope(true);
     visitBlock(ctx->block());
-    fi->CloseOpenUpvals();
-    fi->EmitJmp(0, int32_t(pcBeforeExp - fi->PC() - 1));
+    auto lastLine = ctx->block()->LastLine();
+    fi->CloseOpenUpvals(lastLine);
+    fi->EmitJmp(lastLine, 0, int32_t(pcBeforeExp - fi->PC() - 1));
     fi->ExitScope(fi->PC() - 1);
     fi->FixSbx(pcJmpToEnd, int32_t(fi->PC() - pcJmpToEnd - 1));
 
@@ -812,11 +794,13 @@ std::any lua::CodeGen::visitRepeat(LuaParser::RepeatContext* ctx)
     auto pcBeforeBlock = fi->PC();
     visitBlock(ctx->block());
     auto oldRegs = fi->usedRegs;
-    auto [a, _] = ExpToOpArg(ctx->exp(), Arg::REG);
+    auto testExp = ctx->exp();
+    auto [a, _] = ExpToOpArg(testExp, Arg::REG);
     fi->usedRegs = oldRegs;
-    fi->EmitTest(a, 0);
-    fi->EmitJmp(fi->GetJmpArgA(), int32_t(pcBeforeBlock - fi->PC() - 1));
-    fi->CloseOpenUpvals();
+    auto line = testExp->Line();
+    fi->EmitTest(line, a, 0);
+    fi->EmitJmp(line, fi->GetJmpArgA(), int32_t(pcBeforeBlock - fi->PC() - 1));
+    fi->CloseOpenUpvals(line);
     fi->ExitScope(fi->PC());
 
     return std::any();
@@ -845,23 +829,24 @@ std::any lua::CodeGen::visitIf(LuaParser::IfContext* ctx)
         slot_type a;
         if (exp)
         {
-            a=  ExpToOpArg(exp, Arg::REG).first;
+            a = ExpToOpArg(exp, Arg::REG).first;
         }
         else
         {
             a = fi->AllocReg();
-            fi->EmitLoadBool(a, 1, 0);
+            fi->EmitLoadBool(ctx->ELSE()->getSymbol()->getLine(), a, 1, 0);
         }
         fi->usedRegs = oldRegs;
-        fi->EmitTest(a, 0);
-        pcJmpToNextExp = fi->EmitJmp(0, 0);
+        auto line = exp->Line();
+        fi->EmitTest(line, a, 0);
+        pcJmpToNextExp = fi->EmitJmp(line, 0, 0);
 
         auto block = blocks[i];
         fi->EnterScope(false);
         visitBlock(block);
-        fi->CloseOpenUpvals();
+        fi->CloseOpenUpvals(block->LastLine());
         fi->ExitScope(fi->PC());
-        pcJmpToEnds[i] = i + 1 < exps.size() ? fi->EmitJmp(0, 0) : pcJmpToNextExp;
+        pcJmpToEnds[i] = i + 1 < exps.size() ? fi->EmitJmp(block->LastLine(), 0, 0) : pcJmpToNextExp;
     }
 
     for (auto&& pc : pcJmpToEnds)
@@ -882,21 +867,22 @@ std::any lua::CodeGen::visitFornumerical(LuaParser::FornumericalContext* ctx)
     auto exps = ctx->exp();
     if (exps.size() < 3)
     {
-        DoVarDecl(exps, {forIndexVar, forLimitVar});
+        DoVarDecl(exps, {forIndexVar, forLimitVar}, ctx->Line());
         auto a = fi->AddLocVar(forStepVar, fi->PC());
-        fi->EmitLoadK(a, 1);
+        fi->EmitLoadK(ctx->Line(), a, 1);
     }
     else
     {
-        DoVarDecl(exps, {forIndexVar, forLimitVar, forStepVar});
+        DoVarDecl(exps, {forIndexVar, forLimitVar, forStepVar}, ctx->Line());
     }
     fi->AddLocVar(ctx->NAME()->getText(), fi->PC() + 1);
 
     auto a = fi->usedRegs - 4;
-    auto pcForPrep = fi->EmitForPrep(a, 0);
-    visitBlock(ctx->block());
-    fi->CloseOpenUpvals();
-    auto pcForLoop = fi->EmitForLoop(a, 0);
+    auto pcForPrep = fi->EmitForPrep(ctx->DO()->getSymbol()->getLine(), a, 0);
+    auto block = ctx->block();
+    visitBlock(block);
+    fi->CloseOpenUpvals(block->LastLine());
+    auto pcForLoop = fi->EmitForLoop(ctx->FOR()->getSymbol()->getLine(), a, 0);
     fi->FixSbx(pcForPrep, int32_t(pcForLoop - pcForPrep - 1));
     fi->FixSbx(pcForLoop, int32_t(pcForPrep - pcForLoop));
     fi->ExitScope(fi->PC() - 1);
@@ -915,21 +901,23 @@ std::any lua::CodeGen::visitForgeneric(LuaParser::ForgenericContext* ctx)
 
     auto exps = ctx->explist()->exp();
     fi->EnterScope(true);
-    DoVarDecl(exps, {forGeneratorVar, forStateVar, forControlVar /*, forClosingVar*/});
+    DoVarDecl(exps, {forGeneratorVar, forStateVar, forControlVar /*, forClosingVar*/}, ctx->Line());
     auto names = ctx->namelist()->NAME();
     for (auto&& nn : names)
     {
         fi->AddLocVar(nn->getText(), fi->PC() + 1);
     }
 
-    auto pcJmpToTFC = fi->EmitJmp(0, 0);
-    visitBlock(ctx->block());
-    fi->CloseOpenUpvals();
+    auto pcJmpToTFC = fi->EmitJmp(ctx->DO()->getSymbol()->getLine(), 0, 0);
+    auto block = ctx->block();
+    visitBlock(block);
+    fi->CloseOpenUpvals(block->LastLine());
     fi->FixSbx(pcJmpToTFC, int32_t(fi->PC() - pcJmpToTFC - 1));
 
+    auto line = exps.front()->Line();
     auto r = fi->SlotOfLocVar(forGeneratorVar);
-    fi->EmitTForCall(r, (slot_type)names.size());
-    fi->EmitTForLoop(r + 2, int32_t(pcJmpToTFC - fi->PC()));
+    fi->EmitTForCall(line, r, (slot_type)names.size());
+    fi->EmitTForLoop(line, r + 2, int32_t(pcJmpToTFC - fi->PC()));
     fi->ExitScope(fi->PC() - 1);
     fi->FixEndPC(forGeneratorVar, 2);
     fi->FixEndPC(forStateVar, 2);
@@ -965,14 +953,14 @@ std::any lua::CodeGen::visitFuncnamedef(LuaParser::FuncnamedefContext* ctx)
         self = fname->COL();
         if (2 == nsz)
         {
-            a = NameToOpArg(names.front()->getText(), Arg::RU);
+            a = NameToOpArg(names.front()->getText(), Arg::RU, ctx->Line());
         }
         else
         {
             a = {fi->AllocReg(), Arg::REG};
             PrepFuncName(a.first, names.rbegin() + 1, names.rend() - 1);
         }
-        k = ConstantToOpArg(names.back()->getText());
+        k = ConstantToOpArg(names.back()->getText(), names.back()->getSymbol()->getLine());
     }
     auto v = fi->AllocReg();
     auto old_a = _a;
@@ -985,11 +973,11 @@ std::any lua::CodeGen::visitFuncnamedef(LuaParser::FuncnamedefContext* ctx)
         auto varName = names.back()->getText();
         if (auto a = fi->SlotOfLocVar(varName); a >= 0)
         {
-            fi->EmitMove(a, v);
+            fi->EmitMove(ctx->Line(), a, v);
         }
         else if (auto b = (slot_type)fi->IndexOfUpval(varName); b >= 0)
         {
-            fi->EmitSetUpval(v, b);
+            fi->EmitSetUpval(Line(names.back()), v, b);
         }
         else
         {
@@ -1000,12 +988,13 @@ std::any lua::CodeGen::visitFuncnamedef(LuaParser::FuncnamedefContext* ctx)
                 g = (slot_type)fi->IndexOfUpval(str::ENV);
             }
             auto c = (slot_type)(k < 0 ? 0x100 + fi->IndexOfConstant(varName) : k);
-            up ? fi->EmitSetTabUp(g, c, v) : fi->EmitSetTable(g, c, v);
+            up ? fi->EmitSetTabUp(Line(names.back()), g, c, v) : fi->EmitSetTable(Line(names.back()), g, c, v);
         }
     }
     else
     {
-        a.second == Arg::UPVAL ? fi->EmitSetTabUp(a.first, k, v) : fi->EmitSetTable(a.first, k, v);
+        a.second == Arg::UPVAL ? fi->EmitSetTabUp(Line(names.back()), a.first, k, v)
+                               : fi->EmitSetTable(Line(names.back()), a.first, k, v);
     }
 
     fi->usedRegs = oldRegs;
@@ -1040,7 +1029,7 @@ std::any lua::CodeGen::visitVardecl(LuaParser::VardeclContext* ctx)
         names.emplace_back(n->getText());
     }
 
-    DoVarDecl(exps, std::move(names));
+    DoVarDecl(exps, std::move(names), ctx->Line());
 
     return std::any();
 }
@@ -1072,17 +1061,17 @@ slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, sl
     auto oldRegs = fi->usedRegs;
     if (next == end_m)
     {
-        // table args 
+        // table args
         auto k = Arg::RU;
         if (start != end)
         {
             p = {fi->AllocReg(), Arg::REG};
             auto nArgs = PrepFuncCall(node, p.first, start, end);
-            fi->EmitCall(p.first, nArgs, 1);
+            fi->EmitCall(node->Line(), p.first, nArgs, 1);
         }
         else if (auto name = node->NAME())
         {
-            p = NameToOpArg(name->getText(), k);
+            p = NameToOpArg(name, k);
         }
         else
         {
@@ -1098,7 +1087,8 @@ slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, sl
     auto member = *start_m;
     auto c = VisitMember(member);
     fi->usedRegs = oldRegs;
-    Arg::UPVAL == p.second ? fi->EmitGetTabUp(a, p.first, c) : fi->EmitGetTable(a, p.first, c);
+    Arg::UPVAL == p.second ? fi->EmitGetTabUp(node->Line(), a, p.first, c)
+                           : fi->EmitGetTable(node->Line(), a, p.first, c);
 
     return slot_type();
 }
@@ -1112,11 +1102,11 @@ slot_type lua::CodeGen::PrepMemFuncCall(LuaParser::FunctioncallContext* node, sl
         if (start != end)
         {
             auto nArgs = PrepFuncCall(node, a, start, end);
-            fi->EmitCall(a, nArgs, 1);
+            fi->EmitCall(node->Line(), a, nArgs, 1);
         }
         else if (auto name = node->NAME())
         {
-            VisitNAME(name->getText(), a);
+            VisitNAME(name->getText(), a, name->getSymbol()->getLine());
         }
         else
         {
@@ -1144,8 +1134,8 @@ slot_type lua::CodeGen::PrepFuncCall(LuaParser::FunctioncallContext* node, slot_
         auto name = nameArg->NAME();
         argsN = nameArg->args();
         fi->AllocReg();
-        auto c = ConstantToOpArg(name->getText());
-        fi->EmitSelf(a, a, c);
+        auto c = ConstantToOpArg(name->getText(), name->getSymbol()->getLine());
+        fi->EmitSelf(node->Line(), a, a, c);
     }
     else
     {
@@ -1203,7 +1193,7 @@ void lua::CodeGen::PrepPrefix(LuaParser::PrefixexpContext* pre, slot_type a, mem
         case 1:
         {
             auto name = static_cast<LuaParser::NameindexContext*>(pre)->NAME();
-            p = NameToOpArg(name->getText(), k);
+            p = NameToOpArg(name, k);
         }
         break;
         case 2:
@@ -1229,7 +1219,8 @@ void lua::CodeGen::PrepPrefix(LuaParser::PrefixexpContext* pre, slot_type a, mem
 
     auto c = VisitMember(*start);
     fi->usedRegs = oldRegs;
-    Arg::UPVAL == p.second ? fi->EmitGetTabUp(a, p.first, c) : fi->EmitGetTable(a, p.first, c);
+    Arg::UPVAL == p.second ? fi->EmitGetTabUp(pre->Line(), a, p.first, c)
+                           : fi->EmitGetTable(pre->Line(), a, p.first, c);
 }
 
 void lua::CodeGen::PrepPrefix(LuaParser::PrefixexpContext* pre, slot_type a, slot_type n, MemberContexts& mems)
@@ -1242,7 +1233,7 @@ void lua::CodeGen::PrepPrefix(LuaParser::PrefixexpContext* pre, slot_type a, slo
         case 1:
         {
             auto name = static_cast<LuaParser::NameindexContext*>(pre)->NAME();
-            VisitNAME(name->getText(), a);
+            VisitNAME(name->getText(), a, name->getSymbol()->getLine());
         }
         break;
         case 2:
@@ -1275,16 +1266,16 @@ slot_type lua::CodeGen::PrepFuncName(slot_type a, name_iterator start, name_iter
     {
         auto k = Arg::RU;
         auto name = *end;
-        p = NameToOpArg(name->getText(), k);
+        p = NameToOpArg(name, k);
     }
     else
     {
         p = {fi->AllocReg(), Arg::REG};
         PrepFuncName(p.first, next, end);
     }
-    auto c = ConstantToOpArg((*start)->getText());
+    auto c = ConstantToOpArg((*start)->getText(), (*start)->getSymbol()->getLine());
     fi->usedRegs = oldRegs;
-    Arg::UPVAL == p.second ? fi->EmitGetTabUp(a, p.first, c) : fi->EmitGetTable(a, p.first, c);
+    Arg::UPVAL == p.second ? fi->EmitGetTabUp(Line(*end), a, p.first, c) : fi->EmitGetTable(Line(*end), a, p.first, c);
     return {};
 }
 
@@ -1293,69 +1284,69 @@ std::any lua::CodeGen::visitTerminal(antlr4::tree::TerminalNode* ctx)
     return std::any();
 }
 
-void lua::CodeGen::VisitNAME(const std::string& text, slot_type a)
+void lua::CodeGen::VisitNAME(const std::string& text, slot_type a, uint32_t line)
 {
     if (auto r = fi->SlotOfLocVar(text); r >= 0)
     {
-        fi->EmitMove(a, r);
+        fi->EmitMove(line, a, r);
     }
     else if (auto idx = fi->IndexOfUpval(text); idx >= 0)
     {
-        fi->EmitGetUpval(a, (slot_type)idx);
+        fi->EmitGetUpval(line, a, (slot_type)idx);
     }
     else
     {
         auto oldRegs = fi->usedRegs;
-        auto [b, kindB] = NameToOpArg(str::ENV, Arg::RU);
-        auto c = ConstantToOpArg(text);
+        auto [b, kindB] = NameToOpArg(str::ENV, Arg::RU, 0);
+        auto c = ConstantToOpArg(text, line);
         fi->usedRegs = oldRegs;
-        Arg::UPVAL == kindB ? fi->EmitGetTabUp(a, b, c) : fi->EmitGetTable(a, b, c);
+        Arg::UPVAL == kindB ? fi->EmitGetTabUp(line, a, b, c) : fi->EmitGetTable(line, a, b, c);
     }
 }
 
 std::any lua::CodeGen::visitNil(LuaParser::NilContext* ctx)
 {
-    fi->EmitLoadNil(_a, _n);
+    fi->EmitLoadNil(ctx->Line(), _a, _n);
     return std::any();
 }
 
 std::any lua::CodeGen::visitFalse(LuaParser::FalseContext* ctx)
 {
-    fi->EmitLoadBool(_a, 0, 0);
+    fi->EmitLoadBool(ctx->Line(), _a, 0, 0);
     return std::any();
 }
 
 std::any lua::CodeGen::visitTrue(LuaParser::TrueContext* ctx)
 {
-    fi->EmitLoadBool(_a, 1, 0);
+    fi->EmitLoadBool(ctx->Line(), _a, 1, 0);
     return std::any();
 }
 
 std::any lua::CodeGen::visitInt(LuaParser::IntContext* ctx)
 {
     auto str = ctx->INT()->getText();
-    fi->EmitLoadK(_a, ToInt(str));
+    fi->EmitLoadK(ctx->Line(), _a, ToInt(str));
     return std::any();
 }
 
 std::any lua::CodeGen::visitHex(LuaParser::HexContext* ctx)
 {
     auto str = ctx->HEX()->getText();
-    fi->EmitLoadK(_a, ToHex(str));
+    fi->EmitLoadK(ctx->Line(), _a, ToHex(str));
     return std::any();
 }
 
 std::any lua::CodeGen::visitFloat(LuaParser::FloatContext* ctx)
 {
     auto str = ctx->FLOAT()->getText();
-    fi->EmitLoadK(_a, ToFloat(str));
+    fi->EmitLoadK(ctx->Line(), _a, ToFloat(str));
     return std::any();
 }
 
 std::any lua::CodeGen::visitHexfloat(LuaParser::HexfloatContext* ctx)
 {
     auto str = ctx->HEX_FLOAT()->getText();
-    fi->EmitLoadK(_a, ToHexFloat(str));
+    fi->EmitLoadK(ctx->Line(), _a, ToHexFloat(str));
     return std::any();
 }
 
@@ -1363,7 +1354,7 @@ std::any lua::CodeGen::visitNormalstring(LuaParser::NormalstringContext* ctx)
 {
     auto str = ctx->NORMALSTRING()->getText();
     std::string_view sv(str.begin() + 1, str.end() - 1);
-    fi->EmitLoadK(_a, Unescape(sv));
+    fi->EmitLoadK(ctx->Line(), _a, Unescape(sv));
     return std::any();
 }
 
@@ -1371,14 +1362,14 @@ std::any lua::CodeGen::visitCharstring(LuaParser::CharstringContext* ctx)
 {
     auto str = ctx->CHARSTRING()->getText();
     std::string_view sv(str.begin() + 1, str.end() - 1);
-    fi->EmitLoadK(_a, Unescape(sv));
+    fi->EmitLoadK(ctx->Line(), _a, Unescape(sv));
     return std::any();
 }
 
 std::any lua::CodeGen::visitLongstring(LuaParser::LongstringContext* ctx)
 {
     auto str = ctx->LONGSTRING()->getText();
-    fi->EmitLoadK(_a, TrimLong(str));
+    fi->EmitLoadK(ctx->Line(), _a, TrimLong(str));
     return std::any();
 }
 
@@ -1389,7 +1380,7 @@ std::any lua::CodeGen::visitVarargexp(LuaParser::VarargexpContext* ctx)
     {
         // TODO error
     }
-    fi->EmitVararg(a, n);
+    fi->EmitVararg(ctx->Line(), a, n);
     return std::any();
 }
 
@@ -1418,7 +1409,7 @@ std::any lua::CodeGen::visitFunctioncall(LuaParser::FunctioncallContext* ctx)
 {
     auto [a, n] = GetPara();
     auto nArgs = PrepFuncCall(ctx, a);
-    fi->EmitCall(a, nArgs, n);
+    fi->EmitCall(ctx->Line(), a, nArgs, n);
     return std::any();
 }
 
@@ -1428,7 +1419,7 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
     auto fl = ctx->fieldlist();
     if (!fl)
     {
-        fi->EmitNewTable(a, 0, 0);
+        fi->EmitNewTable(ctx->Line(), a, 0, 0);
         return {};
     }
     auto fields = fl->field();
@@ -1437,7 +1428,7 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
     auto multRet =
         last->getAltNumber() == 3 && IsVarargOrFuncCall(static_cast<LuaParser::ExpfieldContext*>(last)->exp());
     auto nExps = fields.size();
-    fi->EmitNewTable(a, (slot_type)nArr, slot_type(nExps - nArr));
+    fi->EmitNewTable(ctx->Line(), a, (slot_type)nArr, slot_type(nExps - nArr));
 
     size_t arrIdx{};
     for (size_t i = 0; i < nExps; i++)
@@ -1459,7 +1450,7 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
                     n = flushSize;
                 fi->FreeRegs((slot_type)n);
                 auto c = (arrIdx - 1) / flushSize + 1;
-                fi->EmitSetList(a, slot_type(lastMult ? 0 : n), (slot_type)c);
+                fi->EmitSetList(ctx->Line(), a, slot_type(lastMult ? 0 : n), (slot_type)c);
             }
             continue;
         }
@@ -1477,12 +1468,12 @@ std::any lua::CodeGen::visitTableconstructor(LuaParser::TableconstructorContext*
         {
             auto nfd = static_cast<LuaParser::NamedfieldContext*>(fields[i]);
             valExp = nfd->exp();
-            b = ConstantToOpArg(nfd->NAME()->getText());
+            b = ConstantToOpArg(nfd->NAME()->getText(), ctx->Line());
         }
 
         slot_type c = ExpToOpArg(valExp, Arg::RK).first;
         fi->usedRegs = old;
-        fi->EmitSetTable(a, b, c);
+        fi->EmitSetTable(ctx->Line(), a, b, c);
     }
 
     return std::any();
@@ -1497,12 +1488,12 @@ void lua::CodeGen::VisitLogical(LuaParser::ExpContext* ctx)
     auto b = ExpToOpArg(exps.front(), Arg::REG).first;
     fi->usedRegs = oldRegs;
     constexpr auto c = std::is_same_v<LuaParser::AndContext, T> ? 0 : 1;
-    fi->EmitTestSet(a, b, c);
-    auto pcOfJmp = fi->EmitJmp(0, 0);
+    fi->EmitTestSet(ctx->Line(), a, b, c);
+    auto pcOfJmp = fi->EmitJmp(ctx->Line(), 0, 0);
 
     b = ExpToOpArg(exps.back(), Arg::REG).first;
     fi->usedRegs = oldRegs;
-    fi->EmitMove(a, b);
+    fi->EmitMove(ctx->Line(), a, b);
     fi->FixSbx(pcOfJmp, int32_t(fi->PC() - pcOfJmp - 1));
 }
 
@@ -1526,7 +1517,7 @@ std::any lua::CodeGen::visitExponentiation(LuaParser::ExponentiationContext* ctx
     auto a = _a;
     auto oldRegs = fi->usedRegs;
     auto [b, c] = ExpToOpArg(ctx->exp(), Arg::RK);
-    fi->EmitABC(Op::POW, a, b, c);
+    fi->EmitABC(ctx->Line(), Op::POW, a, b, c);
     fi->usedRegs = oldRegs;
     return std::any();
 }
@@ -1552,7 +1543,7 @@ std::any lua::CodeGen::visitUnary(LuaParser::UnaryContext* ctx)
         op = Op::BNOT;
         break;
     }
-    fi->EmitABC(op, a, b, 0);
+    fi->EmitABC(ctx->Line(), op, a, b, 0);
     fi->usedRegs = oldRegs;
     return std::any();
 }
@@ -1578,7 +1569,7 @@ std::any lua::CodeGen::visitMultidiv(LuaParser::MultidivContext* ctx)
         op = Op::IDIV;
         break;
     }
-    fi->EmitABC(op, a, b, c);
+    fi->EmitABC(ctx->Line(), op, a, b, c);
     fi->usedRegs = oldRegs;
     return std::any();
 }
@@ -1598,7 +1589,7 @@ std::any lua::CodeGen::visitAddsub(LuaParser::AddsubContext* ctx)
         op = Op::SUB;
         break;
     }
-    fi->EmitABC(op, a, b, c);
+    fi->EmitABC(ctx->Line(), op, a, b, c);
     fi->usedRegs = oldRegs;
     return std::any();
 }
@@ -1616,7 +1607,7 @@ std::any lua::CodeGen::visitConcatenation(LuaParser::ConcatenationContext* ctx)
     auto c = fi->usedRegs - 1;
     auto b = c - (slot_type)exps.size() + 1;
     fi->FreeRegs(c - b + 1);
-    fi->EmitConcat(a, b, c);
+    fi->EmitConcat(ctx->Line(), a, b, c);
     return std::any();
 }
 
@@ -1628,27 +1619,27 @@ std::any lua::CodeGen::visitRelation(LuaParser::RelationContext* ctx)
     switch (ctx->bop3()->getAltNumber())
     {
     case 1:
-        fi->EmitABC(Op::LT, 1, b, c);
+        fi->EmitABC(ctx->Line(), Op::LT, 1, b, c);
         break;
     case 2:
-        fi->EmitABC(Op::LT, 1, c, b);
+        fi->EmitABC(ctx->Line(), Op::LT, 1, c, b);
         break;
     case 3:
-        fi->EmitABC(Op::LE, 1, b, c);
+        fi->EmitABC(ctx->Line(), Op::LE, 1, b, c);
         break;
     case 4:
-        fi->EmitABC(Op::LE, 1, c, b);
+        fi->EmitABC(ctx->Line(), Op::LE, 1, c, b);
         break;
     case 5:
-        fi->EmitABC(Op::EQ, 0, b, c);
+        fi->EmitABC(ctx->Line(), Op::EQ, 0, b, c);
         break;
     default:
-        fi->EmitABC(Op::EQ, 1, b, c);
+        fi->EmitABC(ctx->Line(), Op::EQ, 1, b, c);
         break;
     }
-    fi->EmitJmp(0, 1);
-    fi->EmitLoadBool(a, 0, 1);
-    fi->EmitLoadBool(a, 1, 0);
+    fi->EmitJmp(ctx->Line(), 0, 1);
+    fi->EmitLoadBool(ctx->Line(), a, 0, 1);
+    fi->EmitLoadBool(ctx->Line(), a, 1, 0);
     fi->usedRegs = oldRegs;
     return std::any();
 }
@@ -1689,7 +1680,7 @@ std::any lua::CodeGen::visitBitwise(LuaParser::BitwiseContext* ctx)
         op = Op::SHR;
         break;
     }
-    fi->EmitABC(op, a, b, c);
+    fi->EmitABC(ctx->Line(), op, a, b, c);
     fi->usedRegs = oldRegs;
     return std::any();
 }

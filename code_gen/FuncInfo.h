@@ -46,7 +46,7 @@ constexpr char TOSTRING[] = "__tostring";
 }  // namespace str
 
 // TODO chunk and header
-
+struct TopPrototype;
 struct Prototype
 {
     struct Upvalue
@@ -74,11 +74,16 @@ struct Prototype
     std::vector<uint32_t> LineInfo;
     std::vector<LocVar> LocVars;
     std::vector<std::string> UpvalueNames;
+
+    const TopPrototype* Top() const;
 };
 struct TopPrototype : Prototype
 {
     ErrorCollector ec;
     std::string Source;
+
+    void PrintError(std::ostream&);
+    std::string ShortSource() const;
 };
 
 struct UpvalInfo
@@ -115,13 +120,13 @@ struct FuncInfo
     std::vector<std::unique_ptr<std::vector<size_t>>> breaks;
     std::vector<uint32_t> insts;
     std::vector<uint32_t> lineNums;
-    uint32_t line{};
-    uint32_t lastLine{};
+    const uint32_t line{};
+    const uint32_t lastLine{};
     uint32_t numParams{};
     bool isVararg = true;
 
     // FuncInfo() = default;
-    FuncInfo(FuncInfo* p = {});
+    FuncInfo(LuaRuleContext* node, FuncInfo* p = {});
 
     static int32_t Int2fb(int32_t x);
 
@@ -143,41 +148,42 @@ struct FuncInfo
 
     slot_type GetJmpArgA() const;
     void AddBreakJmp(size_t pc);
-    void CloseOpenUpvals();
+    void CloseOpenUpvals(uint32_t line);
     void FixSbx(size_t pc, int32_t sBx);
     void FixEndPC(const std::string& name, int32_t delta);
 
-    void EmitABC(Op opcode, slot_type a, slot_type b, slot_type c);
-    void EmitABx(Op opcode, slot_type a, int32_t bx);
-    void EmitAsBx(Op opcode, slot_type a, int32_t bx);
-    void EmitAx(Op opcode, int32_t ax);
+    void EmitInstruction(uint32_t line, uint32_t i);
+    void EmitABC(uint32_t line, Op opcode, slot_type a, slot_type b, slot_type c);
+    void EmitABx(uint32_t line, Op opcode, slot_type a, int32_t bx);
+    void EmitAsBx(uint32_t line, Op opcode, slot_type a, int32_t bx);
+    void EmitAx(uint32_t line, Op opcode, int32_t ax);
 
-    void EmitReturn(slot_type a, slot_type n);
-    void EmitClosure(slot_type a, int32_t bx);
-    void EmitTailCall(slot_type a, slot_type n);
-    void EmitCall(slot_type a, slot_type b, slot_type c);
-    void EmitLoadNil(slot_type a, slot_type n);
-    void EmitLoadBool(slot_type a, slot_type b, slot_type c);
-    void EmitLoadK(slot_type a, any_type k);
-    void EmitVararg(slot_type a, slot_type n);
-    void EmitMove(slot_type a, slot_type b);
-    void EmitSetUpval(slot_type a, slot_type b);
-    void EmitGetUpval(slot_type a, slot_type b);
-    void EmitSetTable(slot_type a, slot_type b, slot_type c);
-    void EmitGetTable(slot_type a, slot_type b, slot_type c);
-    void EmitSetTabUp(slot_type a, slot_type b, slot_type c);
-    void EmitGetTabUp(slot_type a, slot_type b, slot_type c);
-    size_t EmitJmp(slot_type a, int32_t sBx);
-    void EmitTest(slot_type a, slot_type c);
-    void EmitTestSet(slot_type a, slot_type b, slot_type c);
-    size_t EmitForPrep(slot_type a, int32_t sBx);
-    size_t EmitForLoop(slot_type a, int32_t sBx);
-    void EmitTForCall(slot_type a, slot_type c);
-    void EmitTForLoop(slot_type a, int32_t sBx);
-    void EmitSelf(slot_type a, slot_type b, slot_type c);
-    void EmitNewTable(slot_type a, slot_type nArr, slot_type nRec);
-    void EmitSetList(slot_type a, slot_type b, slot_type c);
-    void EmitConcat(slot_type a, slot_type b, slot_type c);
+    void EmitReturn(uint32_t line, slot_type a, slot_type n);
+    void EmitClosure(uint32_t line, slot_type a, int32_t bx);
+    void EmitTailCall(uint32_t line, slot_type a, slot_type n);
+    void EmitCall(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitLoadNil(uint32_t line, slot_type a, slot_type n);
+    void EmitLoadBool(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitLoadK(uint32_t line, slot_type a, any_type k);
+    void EmitVararg(uint32_t line, slot_type a, slot_type n);
+    void EmitMove(uint32_t line, slot_type a, slot_type b);
+    void EmitSetUpval(uint32_t line, slot_type a, slot_type b);
+    void EmitGetUpval(uint32_t line, slot_type a, slot_type b);
+    void EmitSetTable(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitGetTable(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitSetTabUp(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitGetTabUp(uint32_t line, slot_type a, slot_type b, slot_type c);
+    size_t EmitJmp(uint32_t line, slot_type a, int32_t sBx);
+    void EmitTest(uint32_t line, slot_type a, slot_type c);
+    void EmitTestSet(uint32_t line, slot_type a, slot_type b, slot_type c);
+    size_t EmitForPrep(uint32_t line, slot_type a, int32_t sBx);
+    size_t EmitForLoop(uint32_t line, slot_type a, int32_t sBx);
+    void EmitTForCall(uint32_t line, slot_type a, slot_type c);
+    void EmitTForLoop(uint32_t line, slot_type a, int32_t sBx);
+    void EmitSelf(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitNewTable(uint32_t line, slot_type a, slot_type nArr, slot_type nRec);
+    void EmitSetList(uint32_t line, slot_type a, slot_type b, slot_type c);
+    void EmitConcat(uint32_t line, slot_type a, slot_type b, slot_type c);
 
     void ToProto(Prototype& proto);
     void GetConstants(std::vector<any_type>& v);

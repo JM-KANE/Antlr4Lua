@@ -5,6 +5,7 @@
 
 #include "LuaParserBaseVisitor.h"
 #include "FuncInfo.h"
+#include "LuaException.h"
 
 namespace lua
 {
@@ -33,6 +34,7 @@ private:
     static std::string TrimLong(const std::string& str);
 
     void VisitWithPara(slot_type a, slot_type n, LuaRuleContext* ctx);
+    static uint32_t Line(antlr4::tree::TerminalNode* ctx);
 
 public:
     // static auto& Instance()
@@ -49,10 +51,10 @@ public:
 
     std::pair<slot_type, uint8_t> ExpToOpArg(LuaParser::ExpContext* node, uint8_t argKinds);
     std::pair<slot_type, slot_type> ExpToOpArg(const std::vector<LuaParser::ExpContext*>& nodes, uint8_t argKinds);
-    std::pair<slot_type, uint8_t> NameToOpArg(const std::string& name, uint8_t argKinds);
-    slot_type ConstantToOpArg(const any_type& cv);
+    std::pair<slot_type, uint8_t> NameToOpArg(const std::string& name, uint8_t argKinds, uint32_t line);
+    std::pair<slot_type, uint8_t> NameToOpArg(antlr4::tree::TerminalNode* name, uint8_t argKinds);
+    slot_type ConstantToOpArg(const any_type& cv, uint32_t line);
     std::pair<slot_type, uint8_t> PrefixToOpArg(LuaParser::PrefixexpContext* node, uint8_t argKinds);
-
 
     slot_type VisitMember(LuaParser::MemberContext* member);
 
@@ -66,7 +68,7 @@ public:
     std::any visitRetstat(LuaParser::RetstatContext* ctx) override;
     // void visitExp(LuaParser::ExpContext* ctx, slot_type a, slot_type n);
 
-    void DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names);
+    void DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names, uint32_t line);
     std::any visitAssign(LuaParser::AssignContext* ctx) override;
     std::any visitFunctioncall_(LuaParser::Functioncall_Context* ctx) override;
     std::any visitLabel(LuaParser::LabelContext* ctx) override;
@@ -100,7 +102,7 @@ public:
     slot_type PrepFuncName(slot_type a, name_iterator start, name_iterator end);
 
     std::any visitTerminal(antlr4::tree::TerminalNode* ctx) override;
-    void VisitNAME(const std::string& text, slot_type a);
+    void VisitNAME(const std::string& text, slot_type a, uint32_t line);
 
     std::any visitNil(LuaParser::NilContext* ctx) override;
     std::any visitFalse(LuaParser::FalseContext* ctx) override;

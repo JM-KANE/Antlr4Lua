@@ -1,4 +1,5 @@
 #include "LuaParser.h"
+#include "LuaRuleContext.h"
 using namespace lua;
 void LuaRuleContext::FixAltNum() const
 {
@@ -78,6 +79,18 @@ void LuaRuleContext::FixAltNum() const
         }
     }
 }
+antlr4::Token* lua::LuaRuleContext::FindFirstNonNullStart() const
+{
+    if (auto tk = getStart())
+        return tk;
+    return static_cast<LuaRuleContext*>(parent)->FindFirstNonNullStart();
+}
+antlr4::Token* lua::LuaRuleContext::FindFirstNonNullStop() const
+{
+    if (auto tk = getStop())
+        return tk;
+    return static_cast<LuaRuleContext*>(parent)->FindFirstNonNullStop();
+}
 size_t lua::LuaRuleContext::getAltNumber() const
 {
     FixAltNum();
@@ -87,4 +100,14 @@ size_t lua::LuaRuleContext::getAltNumber() const
 void lua::LuaRuleContext::setAltNumber(size_t altNumber)
 {
     _altNum = altNumber;
+}
+
+uint32_t lua::LuaRuleContext::Line() const
+{
+    return FindFirstNonNullStart()->getLine();
+}
+
+uint32_t lua::LuaRuleContext::LastLine() const
+{
+    return FindFirstNonNullStop()->getLine();
 }

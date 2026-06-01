@@ -1,5 +1,6 @@
 #include "Instruction.h"
 #include "OpCode.h"
+#include "State.h"
 
 using namespace lua;
 

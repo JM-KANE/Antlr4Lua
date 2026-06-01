@@ -150,8 +150,11 @@ public:
     std::ostream* err = &std::cerr;
     std::vector<std::unique_ptr<TopPrototype>> topProtos;
     Collector gc;
+
     VirtualMachine(int argc, const char** argv);
     void Run();
+    void PrintSyntaxError();
+
     TopPrototype& NewProto();
     Closure& NewLuaClosure(const Prototype& p);
     Closure& NewFuncClosure(Function f, size_t nUpvals);

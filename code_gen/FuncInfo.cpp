@@ -1,6 +1,27 @@
 #include "FuncInfo.h"
 using namespace lua;
 
+void lua::TopPrototype::PrintError(std::ostream& os)
+{
+    for (auto&& err : ec.GetErrors())
+    {
+        os << ShortSource() << err.Msg() << std::endl;
+    }
+    ec.Clear();
+}
+
+std::string lua::TopPrototype::ShortSource() const
+{
+    if (Source.front() == '@')
+    {
+        return Source.substr(1);
+    }
+    std::string src = "[string \"";
+    src += Source;
+    src += "\"]";
+    return src;
+}
+
 lua::LocVarInfo::LocVarInfo(std::string n, uint32_t slv, slot_type st, size_t s, size_t e)
     : name(std::move(n)),
       scopeLv(slv),
@@ -14,7 +35,7 @@ lua::LocVarInfo::LocVarInfo(std::string n, uint32_t slv, slot_type st, size_t s,
 // {
 // }
 
-lua::FuncInfo::FuncInfo(FuncInfo* p) : parent(p)
+lua::FuncInfo::FuncInfo(LuaRuleContext* node, FuncInfo* p) : parent(p), line(node->Line()), lastLine(node->LastLine())
 {
     breaks.emplace_back();
 }
@@ -241,12 +262,12 @@ void lua::FuncInfo::AddBreakJmp(size_t pc)
     // error
 }
 
-void lua::FuncInfo::CloseOpenUpvals()
+void lua::FuncInfo::CloseOpenUpvals(uint32_t line)
 {
     auto a = GetJmpArgA();
     if (a > 0)
     {
-        EmitJmp(a, 0);
+        EmitJmp(line, a, 0);
     }
 }
 
@@ -269,178 +290,184 @@ void lua::FuncInfo::FixEndPC(const std::string& name, int32_t delta)
     }
 }
 
-void lua::FuncInfo::EmitABC(Op opcode, slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitInstruction(uint32_t line, uint32_t i)
+{
+    insts.emplace_back(i);
+    lineNums.emplace_back(line);
+}
+
+void lua::FuncInfo::EmitABC(uint32_t line, Op opcode, slot_type a, slot_type b, slot_type c)
 {
     auto i = uint32_t(opcode) | a << 6 | b << 23 | c << 14;
-    insts.emplace_back(i);
+    EmitInstruction(i, line);
 }
 
-void lua::FuncInfo::EmitABx(Op opcode, slot_type a, int32_t bx)
+void lua::FuncInfo::EmitABx(uint32_t line, Op opcode, slot_type a, int32_t bx)
 {
     auto i = uint32_t(opcode) | a << 6 | bx << 14;
-    insts.emplace_back(i);
+    EmitInstruction(i, line);
 }
 
-void lua::FuncInfo::EmitAsBx(Op opcode, slot_type a, int32_t bx)
+void lua::FuncInfo::EmitAsBx(uint32_t line, Op opcode, slot_type a, int32_t bx)
 {
     auto i = uint32_t(opcode) | a << 6 | (bx + cv::MAXARG_sBx) << 14;
-    insts.emplace_back(i);
+    EmitInstruction(i, line);
 }
 
-void lua::FuncInfo::EmitAx(Op opcode, int32_t ax)
+void lua::FuncInfo::EmitAx(uint32_t line, Op opcode, int32_t ax)
 {
     auto i = uint32_t(opcode) | ax << 6;
-    insts.emplace_back(i);
+    EmitInstruction(i, line);
 }
 
-void lua::FuncInfo::EmitReturn(slot_type a, slot_type n)
+void lua::FuncInfo::EmitReturn(uint32_t line, slot_type a, slot_type n)
 {
-    EmitABC(Op::RETURN, a, n + 1, 0);
+    EmitABC(line, Op::RETURN, a, n + 1, 0);
 }
 
-void lua::FuncInfo::EmitClosure(slot_type a, int32_t bx)
+void lua::FuncInfo::EmitClosure(uint32_t line, slot_type a, int32_t bx)
 {
-    EmitABx(Op::CLOSURE, a, bx);
+    EmitABx(line, Op::CLOSURE, a, bx);
 }
 
-void lua::FuncInfo::EmitTailCall(slot_type a, slot_type n)
+void lua::FuncInfo::EmitTailCall(uint32_t line, slot_type a, slot_type n)
 {
-    EmitABC(Op::TAILCALL, a, n + 1, 0);
+    EmitABC(line, Op::TAILCALL, a, n + 1, 0);
 }
 
-void lua::FuncInfo::EmitCall(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitCall(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::CALL, a, b + 1, c + 1);
+    EmitABC(line, Op::CALL, a, b + 1, c + 1);
 }
 
-void lua::FuncInfo::EmitLoadNil(slot_type a, slot_type n)
+void lua::FuncInfo::EmitLoadNil(uint32_t line, slot_type a, slot_type n)
 {
-    EmitABC(Op::LOADNIL, a, n - 1, 0);
+    EmitABC(line, Op::LOADNIL, a, n - 1, 0);
 }
 
-void lua::FuncInfo::EmitLoadBool(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitLoadBool(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::LOADBOOL, a, b, c);
+    EmitABC(line, Op::LOADBOOL, a, b, c);
 }
 
-void lua::FuncInfo::EmitLoadK(slot_type a, any_type k)
+void lua::FuncInfo::EmitLoadK(uint32_t line, slot_type a, any_type k)
 {
     auto idx = (int32_t)IndexOfConstant(std::move(k));
     if (idx < (1 << 18))
     {
-        EmitABx(Op::LOADK, a, idx);
+        EmitABx(line, Op::LOADK, a, idx);
     }
     else
     {
-        EmitABx(Op::LOADKX, a, 0);
-        EmitAx(Op::EXTRAARG, idx);
+        EmitABx(line, Op::LOADKX, a, 0);
+        EmitAx(line, Op::EXTRAARG, idx);
     }
 }
 
-void lua::FuncInfo::EmitVararg(slot_type a, slot_type n)
+void lua::FuncInfo::EmitVararg(uint32_t line, slot_type a, slot_type n)
 {
-    EmitABC(Op::VARARG, a, n + 1, 0);
+    EmitABC(line, Op::VARARG, a, n + 1, 0);
 }
 
-void lua::FuncInfo::EmitMove(slot_type a, slot_type b)
+void lua::FuncInfo::EmitMove(uint32_t line, slot_type a, slot_type b)
 {
-    EmitABC(Op::MOVE, a, b, 0);
+    EmitABC(line, Op::MOVE, a, b, 0);
 }
 
-void lua::FuncInfo::EmitSetUpval(slot_type a, slot_type b)
+void lua::FuncInfo::EmitSetUpval(uint32_t line, slot_type a, slot_type b)
 {
-    EmitABC(Op::SETUPVAL, a, b, 0);
+    EmitABC(line, Op::SETUPVAL, a, b, 0);
 }
 
-void lua::FuncInfo::EmitGetUpval(slot_type a, slot_type b)
+void lua::FuncInfo::EmitGetUpval(uint32_t line, slot_type a, slot_type b)
 {
-    EmitABC(Op::GETUPVAL, a, b, 0);
+    EmitABC(line, Op::GETUPVAL, a, b, 0);
 }
 
-void lua::FuncInfo::EmitSetTable(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitSetTable(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::SETTABLE, a, b, c);
+    EmitABC(line, Op::SETTABLE, a, b, c);
 }
 
-void lua::FuncInfo::EmitGetTable(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitGetTable(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::GETTABLE, a, b, c);
+    EmitABC(line, Op::GETTABLE, a, b, c);
 }
 
-void lua::FuncInfo::EmitSetTabUp(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitSetTabUp(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::SETTABUP, a, b, c);
+    EmitABC(line, Op::SETTABUP, a, b, c);
 }
 
-void lua::FuncInfo::EmitGetTabUp(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitGetTabUp(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::GETTABUP, a, b, c);
+    EmitABC(line, Op::GETTABUP, a, b, c);
 }
 
-size_t lua::FuncInfo::EmitJmp(slot_type a, int32_t sBx)
+size_t lua::FuncInfo::EmitJmp(uint32_t line, slot_type a, int32_t sBx)
 {
-    EmitAsBx(Op::JMP, a, sBx);
+    EmitAsBx(line, Op::JMP, a, sBx);
     return PC() - 1;
 }
 
-void lua::FuncInfo::EmitTest(slot_type a, slot_type c)
+void lua::FuncInfo::EmitTest(uint32_t line, slot_type a, slot_type c)
 {
-    EmitABC(Op::TEST, a, 0, c);
+    EmitABC(line, Op::TEST, a, 0, c);
 }
 
-void lua::FuncInfo::EmitTestSet(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitTestSet(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::TESTSET, a, b, c);
+    EmitABC(line, Op::TESTSET, a, b, c);
 }
 
-size_t lua::FuncInfo::EmitForPrep(slot_type a, int32_t sBx)
+size_t lua::FuncInfo::EmitForPrep(uint32_t line, slot_type a, int32_t sBx)
 {
-    EmitAsBx(Op::FORPREP, a, sBx);
+    EmitAsBx(line, Op::FORPREP, a, sBx);
     return PC() - 1;
 }
 
-size_t lua::FuncInfo::EmitForLoop(slot_type a, int32_t sBx)
+size_t lua::FuncInfo::EmitForLoop(uint32_t line, slot_type a, int32_t sBx)
 {
-    EmitAsBx(Op::FORLOOP, a, sBx);
+    EmitAsBx(line, Op::FORLOOP, a, sBx);
     return PC() - 1;
 }
 
-void lua::FuncInfo::EmitTForCall(slot_type a, slot_type c)
+void lua::FuncInfo::EmitTForCall(uint32_t line, slot_type a, slot_type c)
 {
-    EmitABC(Op::TFORCALL, a, 0, c);
+    EmitABC(line, Op::TFORCALL, a, 0, c);
 }
 
-void lua::FuncInfo::EmitTForLoop(slot_type a, int32_t sBx)
+void lua::FuncInfo::EmitTForLoop(uint32_t line, slot_type a, int32_t sBx)
 {
-    EmitAsBx(Op::TFORLOOP, a, sBx);
+    EmitAsBx(line, Op::TFORLOOP, a, sBx);
 }
 
-void lua::FuncInfo::EmitSelf(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitSelf(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::SELF, a, b, c);
+    EmitABC(line, Op::SELF, a, b, c);
 }
 
-void lua::FuncInfo::EmitNewTable(slot_type a, slot_type nArr, slot_type nRec)
+void lua::FuncInfo::EmitNewTable(uint32_t line, slot_type a, slot_type nArr, slot_type nRec)
 {
-    EmitABC(Op::NEWTABLE, a, Int2fb(nArr), Int2fb(nRec));
+    EmitABC(line, Op::NEWTABLE, a, Int2fb(nArr), Int2fb(nRec));
 }
 
-void lua::FuncInfo::EmitSetList(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitSetList(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
     if (c < (1 << 9))
     {
-        EmitABC(Op::SETLIST, a, b, c);
+        EmitABC(line, Op::SETLIST, a, b, c);
     }
     else
     {
-        EmitABC(Op::SETLIST, a, b, 0);
-        EmitAx(Op::EXTRAARG, c - 1);
+        EmitABC(line, Op::SETLIST, a, b, 0);
+        EmitAx(line, Op::EXTRAARG, c - 1);
     }
 }
 
-void lua::FuncInfo::EmitConcat(slot_type a, slot_type b, slot_type c)
+void lua::FuncInfo::EmitConcat(uint32_t line, slot_type a, slot_type b, slot_type c)
 {
-    EmitABC(Op::CONCAT, a, b, c);
+    EmitABC(line, Op::CONCAT, a, b, c);
 }
 
 void lua::FuncInfo::ToProto(Prototype& proto)
@@ -524,4 +551,14 @@ void lua::FuncInfo::ToSubProtos(Prototype& p)
         fi->ToProto(v.emplace_back());
         v.back().Parent = &p;
     }
+}
+
+const TopPrototype* lua::Prototype::Top() const
+{
+    auto p = this;
+    while (p->Parent)
+    {
+        p = p->Parent;
+    }
+    return static_cast<const TopPrototype*>(p);
 }
