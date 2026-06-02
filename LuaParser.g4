@@ -14,6 +14,11 @@ options {
 #include "LuaRuleContext.h"
 }
 
+@parser::members {
+    int loopDepth = 0;
+    std::vector<bool> isVara{true};
+}
+
 start_
     : chunk
     ;
@@ -27,21 +32,36 @@ block
     ;
 
 stat
-    : ';'                                                                       # semistat
-    | varlist '=' explist                                                       # assign
-    | functioncall                                                              # functioncall_
-    | label                                                                     # label_
-    | 'break'                                                                   # break
-    | 'goto' NAME                                                               # goto
-    | 'do' block 'end'                                                          # do
-    | 'while' exp 'do' block 'end'                                              # while
-    | 'repeat' block 'until' exp                                                # repeat
-    | 'if' exp 'then' block ('elseif' exp 'then' block)* ('else' block)? 'end'  # if
-    | 'for' NAME '=' exp ',' exp (',' exp)? 'do' block 'end'                    # fornumerical
-    | 'for' namelist 'in' explist 'do' block 'end'                              # forgeneric
-    | 'function' funcname funcbody                                              # funcnamedef
-    | 'local' 'function' NAME funcbody                                          # localfunc
-    | 'local' attnamelist ('=' explist)?                                        # vardecl
+    : ';'                                                                       
+        # semistat
+    | varlist '=' explist                                                       
+        # assign
+    | functioncall                                                              
+        # functioncall_
+    | label                                                                     
+        # label_
+    | 'break' { if (0 == loopDepth) notifyErrorListeners("break outside loop"); }
+        # break
+    | 'goto' NAME                                                               
+        # goto
+    | 'do' block 'end'                                                          
+        # do
+    | 'while' exp 'do' { ++loopDepth; } block { --loopDepth; } 'end'                                              
+        # while
+    | 'repeat' { ++loopDepth; } block { --loopDepth; } 'until' exp                                                
+        # repeat
+    | 'if' exp 'then' block ('elseif' exp 'then' block)* ('else' block)? 'end'  
+        # if
+    | 'for' NAME '=' exp ',' exp (',' exp)? 'do' { ++loopDepth; } block { --loopDepth; } 'end'                    
+        # fornumerical
+    | 'for' namelist 'in' explist 'do' { ++loopDepth; } block { --loopDepth; } 'end'                              
+        # forgeneric
+    | 'function' funcname funcbody                                              
+        # funcnamedef
+    | 'local' 'function' NAME funcbody                                          
+        # localfunc
+    | 'local' attnamelist ('=' explist)?                                        
+        # vardecl
     ;
 
 attnamelist
@@ -82,7 +102,8 @@ exp
     | 'true'                            # true
     | number                            # number_
     | string                            # string_
-    | '...'                             # varargexp
+    | '...' { if (!isVara.back()) notifyErrorListeners("cannot use '...' outside a vararg function"); }                            
+        # varargexp
     | functiondef                       # functiondef_
     | prefixexp                         # prefixexp_
     | tableconstructor                  # tableconstructor_
@@ -174,7 +195,7 @@ functiondef
     ;
 
 funcbody
-    : '(' parlist ')' block 'end'
+    : '(' parlist ')' block { isVara.pop_back(); } 'end'
     ;
 
 /* lparser.c says "is 'parlist' not empty?"
@@ -182,9 +203,12 @@ funcbody
  * This means that parlist can derive empty.
  */
 parlist
-    : namelist (',' '...')? # nameparlist
-    | '...'                 # varparlist
-    |                       # emptyparlist
+    : namelist { isVara.emplace_back(false); } (',' '...' { isVara.back() = true; })? 
+        # nameparlist
+    | '...' { isVara.emplace_back(true); }
+        # varparlist
+    |       { isVara.emplace_back(false); }  
+        # emptyparlist
     ;
 
 tableconstructor

@@ -29,8 +29,9 @@ Value& lua::Stack::Push(ValuePtr&& val)
     }
     state->Barrier(state, *val);
     slots[top] = std::move(val);
+    auto& valEnd = slots[top];
     ++top;
-    return *slots[top];
+    return *valEnd;
 }
 
 Value& lua::Stack::Push(const ValuePtr& val)

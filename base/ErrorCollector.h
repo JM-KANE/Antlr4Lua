@@ -8,9 +8,11 @@ namespace lua
 struct SyntaxError
 {
     size_t line;
-    size_t charPositionInLine;
+    size_t charPositionInLine{};
     std::string msg;
     antlr4::Token* offendingSymbol;
+
+    SyntaxError(antlr4::Token* sym, size_t _line, std::string msg, size_t charInline = 0);
 
     std::string Msg() const;
 };
@@ -33,6 +35,8 @@ public:
     {
         errors_.clear();
     }
+
+    void CompileError(antlr4::Token* offendingSymbol, size_t line, std::string msg);
 
 private:
     std::vector<SyntaxError> errors_;

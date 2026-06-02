@@ -331,10 +331,8 @@ void tailCall(Instruction i, State* ls)
     auto [a, b, _] = i.ABC();
     ++a;
     auto nArgs = PushFuncAndArgs(a, b, ls);
-    ls->Call(nArgs, -1);
-    PopResults(a, 0, ls);
-
-    // todo: optimize tail call!
+    ls->TailCall(nArgs);
+    // has poped and returned
 }
 // return R(A), ... ,R(A+B-2)
 void _return(Instruction i, State* ls)

@@ -121,6 +121,8 @@ struct State
     void AddPC(int32_t n);
     void CloseUpvalues(int32_t n);
     void Call(int32_t nArgs, int32_t nRes);
+    void TailCall(int32_t nArgs);
+    void DoCall(int32_t nArgs, int32_t nRes, bool tail = true);
     TStatus PCall(int32_t nArgs, int32_t nRes, int32_t msgh);
     bool CallMeta(int obj, std::string_view event);
     template <typename OP>
@@ -269,8 +271,8 @@ struct State
     void Barrier(const Value& parent, const Value& child);
 
     std::pair<ValuePtr, bool> CallMetamethod(Value a, Value b, const char* mmName);
-    void CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c);
-    void CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c);
+    void CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool tail);
+    void CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c, bool tail);
     TStatus RunLuaClosure();
     uint8_t GetTable(const Value& t, const Value& k, bool raw);
     void SetTable(const Value& t, const Value& k, Value v, bool raw);

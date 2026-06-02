@@ -38,6 +38,8 @@ lua::LocVarInfo::LocVarInfo(std::string n, uint32_t slv, slot_type st, size_t s,
 lua::FuncInfo::FuncInfo(LuaRuleContext* node, FuncInfo* p) : parent(p), line(node->Line()), lastLine(node->LastLine())
 {
     breaks.emplace_back();
+    if (parent)
+        ec = parent->ec;
 }
 
 int32_t lua::FuncInfo::Int2fb(int32_t x)
@@ -69,22 +71,19 @@ slot_type lua::FuncInfo::AllocReg()
 {
     if (255 == usedRegs)
     {
-        // TODO error
+        Error(nullptr, line,
+              "too many registers (limit is 255) in function (start line: " + std::to_string(line) + ")");
     }
     ++usedRegs;
     if (usedRegs > maxRegs)
     {
-        usedRegs = maxRegs;
+        maxRegs = usedRegs;
     }
     return usedRegs - 1;
 }
 
 slot_type lua::FuncInfo::AllocRegs(slot_type n)
 {
-    if (n <= 0)
-    {
-        // TODO error
-    }
     for (size_t i = 0; i < n; i++)
     {
         AllocReg();
@@ -97,7 +96,7 @@ void lua::FuncInfo::FreeReg()
 {
     if (0 == usedRegs)
     {
-        // TODO error
+        return;
     }
     --usedRegs;
 }
@@ -229,7 +228,7 @@ slot_type lua::FuncInfo::GetJmpArgA() const
     auto minSlotOfLocVars = maxRegs;
     for (auto&& [name, locVar] : locNames)
     {
-        if (locVar->scopeLv == scopeLv)
+        if (locVar && locVar->scopeLv == scopeLv)
         {
             for (auto v = locVar; v && v->scopeLv == scopeLv; v = v->prev)
             {
@@ -258,8 +257,6 @@ void lua::FuncInfo::AddBreakJmp(size_t pc)
             return;
         }
     }
-
-    // error
 }
 
 void lua::FuncInfo::CloseOpenUpvals(uint32_t line)
@@ -342,7 +339,8 @@ void lua::FuncInfo::EmitCall(uint32_t line, slot_type a, slot_type b, slot_type 
 
 void lua::FuncInfo::EmitLoadNil(uint32_t line, slot_type a, slot_type n)
 {
-    EmitABC(line, Op::LOADNIL, a, n - 1, 0);
+    if (n > 0)
+        EmitABC(line, Op::LOADNIL, a, n - 1, 0);
 }
 
 void lua::FuncInfo::EmitLoadBool(uint32_t line, slot_type a, slot_type b, slot_type c)
@@ -486,7 +484,6 @@ void lua::FuncInfo::ToProto(Prototype& proto)
     if (line == 0)
         proto.LastLineDefined = 0;
 
-    // TODO
     if (proto.MaxStackSize < 2)
     {
         proto.MaxStackSize = 2;

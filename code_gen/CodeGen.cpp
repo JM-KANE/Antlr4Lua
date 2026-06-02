@@ -178,7 +178,6 @@ void lua::CodeGen::SetPara(std::array<slot_type, NP> p)
 
 std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* node, uint8_t argKinds)
 {
-    // TODO deeply inspect the type
     if (argKinds & Arg::CONST)
     {
         slot_type idx = -1;
@@ -313,12 +312,15 @@ std::pair<slot_type, uint8_t> lua::CodeGen::NameToOpArg(antlr4::tree::TerminalNo
     return NameToOpArg(name->getText(), argKinds, Line(name));
 }
 
-slot_type lua::CodeGen::ConstantToOpArg(const any_type& cv, uint32_t line)
+slot_type lua::CodeGen::ConstantToOpArg(const any_type& cv, uint32_t line, bool reg)
 {
-    auto idx = fi->IndexOfConstant(cv);
-    if (idx <= 0xff)
+    if (!reg)
     {
-        return slot_type(idx + 0x100);
+        auto idx = fi->IndexOfConstant(cv);
+        if (idx <= 0xff)
+        {
+            return slot_type(idx + 0x100);
+        }
     }
 
     // Load constant
@@ -402,6 +404,10 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     }
 
     GenerateProto(chunk, proto);
+    if (proto.ec.HasErrors())
+    {
+        return TStatus::ERRSYNTAX;
+    }
 
     return TStatus::OK;
 }
@@ -409,6 +415,7 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
 void lua::CodeGen::GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto)
 {
     root = std::make_unique<FuncInfo>(ck);
+    root->ec = &proto.ec;
     root->AddLocVar(str::ENV, 0);
     fi = root.get();
     visitChunk(ck);
@@ -541,7 +548,7 @@ std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
 
     auto nExps = (slot_type)sz;
     fi->FreeRegs(nExps);
-    fi->EmitReturn(ctx->LastLine(), fi->usedRegs, multRet ? -1 : nExps);  // TODO
+    fi->EmitReturn(ctx->LastLine(), fi->usedRegs, multRet ? -1 : nExps);
 
     return std::any();
 }
@@ -616,114 +623,81 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
     auto nVars = vars.size();
     auto oldRegs = fi->usedRegs;
 
-    std::vector<slot_type> tRegs(nVars);
-    auto kRegs = tRegs;
+    slot_type varR = -1;
+    auto GetValueSlot = [&](size_t i, uint8_t kind, uint32_t line, slot_type a = -1) -> slot_type
+    {
+        slot_type v = -1;
+        if (i < nExps)
+        {
+            auto exp = exps[i];
+            if (i + 1 == nExps && IsVarargOrFuncCall(exp))
+            {
+                auto nLeft = slot_type(nVars - i);
+                varR = fi->AllocRegs(nLeft);
+                VisitWithPara(varR, nLeft, exp);
+                v = varR;
+            }
+            else if (a < 0)
+                v = ExpToOpArg(exp, kind).first;
+        }
+        else if (varR > 0)
+            v = ++varR;
+        else if (a < 0)
+            v = ConstantToOpArg(nullptr, line, !(kind & Arg::CONST));
+        return v;
+    };
 
     for (size_t i = 0; i < nVars; i++)
     {
         if (vars[i]->getAltNumber() == 1)
         {
-            auto name = static_cast<LuaParser::NormalvarContext*>(vars[i])->NAME()->getText();
-            if (fi->SlotOfLocVar(name) < 0 && fi->IndexOfUpval(name) < 0)
+            auto nameNode = static_cast<LuaParser::NormalvarContext*>(vars[i])->NAME();
+            auto name = nameNode->getText();
+            auto line = Line(nameNode);
+            if (auto a = fi->SlotOfLocVar(name); a >= 0)
             {
-                kRegs[i] = -1;
-                if (fi->IndexOfConstant(std::move(name)) > 0xff)
-                {
-                    kRegs[i] = fi->AllocReg();
-                }
+                auto v = GetValueSlot(i, 0, line, a);
+                if (v > 0)
+                    fi->EmitMove(line, a, v);
+                else if (i < nExps)
+                    VisitWithPara(a, 1, exps[i]);
+                else
+                    fi->EmitLoadNil(line, a, 1);
             }
-        }
-        else
-        {
-            auto indexTable = static_cast<LuaParser::IndextableContext*>(vars[i]);
-            tRegs[i] = fi->AllocReg();
-            VisitWithPara(tRegs[i], 1, indexTable->prefixexp());
-            // kRegs[i] = fi->AllocReg();
-            // VisitWithPara(kRegs[i], 1, indexTable->member());
-            kRegs[i] = VisitMember(indexTable->member());
-        }
-    }
-
-    std::vector<slot_type> vRegs(nVars);
-    for (size_t i = 0; i < nVars; i++)
-    {
-        // TODO constant v
-        vRegs[i] = fi->usedRegs + (slot_type)i;
-    }
-    if (nExps >= nVars)
-    {
-        for (size_t i = 0; i < nExps; i++)
-        {
-            auto exp = exps[i];
-            auto a = fi->AllocReg();
-            slot_type n = i >= nVars && i + 1 == nExps && IsVarargOrFuncCall(exp) ? 0 : 1;
-            VisitWithPara(a, n, exp);
-        }
-    }
-    else
-    {
-        bool multRet{};
-        auto n = (slot_type)(nVars - nExps);
-        for (size_t i = 0; i < nExps; i++)
-        {
-            auto exp = exps[i];
-            auto a = fi->AllocReg();
-            if (i + 1 == nExps && IsVarargOrFuncCall(exp))
+            else if (auto b = fi->IndexOfUpval(name); b >= 0)
             {
-                multRet = true;
-                VisitWithPara(a, n + 1, exp);
-                fi->AllocRegs(n);
-            }
-            else
-            {
-                VisitWithPara(a, 1, exp);
-            }
-        }
-        if (!multRet)
-        {
-            auto a = fi->AllocRegs(n);
-            fi->EmitLoadNil(ctx->Line(), a, n);
-        }
-    }
-    for (size_t i = 0; i < nVars; i++)
-    {
-        auto exp = vars[i];
-        if (exp->getAltNumber() == 1)
-        {
-            auto varName = static_cast<LuaParser::NormalvarContext*>(vars[i])->NAME()->getText();
-            if (auto a = fi->SlotOfLocVar(varName); a >= 0)
-            {
-                fi->EmitMove(ctx->Line(), a, vRegs[i]);
-            }
-            else if (auto b = fi->IndexOfUpval(varName); b >= 0)
-            {
-                fi->EmitSetUpval(ctx->Line(), vRegs[i], (slot_type)b);
+                auto v = GetValueSlot(i, Arg::REG, line);
+                fi->EmitSetUpval(ctx->Line(), v, (slot_type)b);
             }
             else
             {
                 slot_type g = fi->SlotOfLocVar(str::ENV);
                 bool up = g < 0;
                 if (up)
-                {
                     g = (slot_type)fi->IndexOfUpval(str::ENV);
-                }
-                auto c = kRegs[i] < 0 ? 0x100 + fi->IndexOfConstant(varName) : kRegs[i];
-                if (up)
-                {
-                    fi->EmitSetTabUp(ctx->Line(), g, (slot_type)c, vRegs[i]);
-                }
-                else
-                {
-                    fi->EmitSetTable(ctx->Line(), g, (slot_type)c, vRegs[i]);
-                }
+                auto k = ConstantToOpArg(name, line);
+                auto v = GetValueSlot(i, Arg::RK, line);
+                up ? fi->EmitSetTabUp(line, g, k, v) : fi->EmitSetTable(line, g, k, v);
             }
         }
         else
         {
-            fi->EmitSetTable(ctx->Line(), tRegs[i], kRegs[i], vRegs[i]);
+            auto indexTable = static_cast<LuaParser::IndextableContext*>(vars[i]);
+            auto [t,  kind] = PrefixToOpArg(indexTable->prefixexp(), Arg::REG);
+            auto member = indexTable->member();
+            auto k = VisitMember(member);
+            auto line = member->Line();
+            auto v = GetValueSlot(i, Arg::RK, line);
+            kind == Arg::UPVAL ? fi->EmitSetTabUp(line, t, k, v) : fi->EmitSetTable(line, t, k, v);
         }
     }
-    fi->usedRegs = oldRegs;  // TODO
+    fi->usedRegs = oldRegs; 
+    for (size_t i = nVars; i < nExps; i++)
+    {
+        auto r = fi->AllocReg();
+        VisitWithPara(r, 0, exps[i]);
+        fi->FreeReg();
+    }
 
     return std::any();
 }
@@ -1159,7 +1133,7 @@ slot_type lua::CodeGen::PrepFuncCall(LuaParser::FunctioncallContext* node, slot_
         }
         VisitWithPara(tmp, n, arg);
     }
-    fi->FreeRegs((slot_type)nArgs);  // TODO lastArgIsVarargOrFuncCall = true ?
+    fi->FreeRegs((slot_type)nArgs);
 
     if (2 == an)
     {
@@ -1380,7 +1354,7 @@ std::any lua::CodeGen::visitVarargexp(LuaParser::VarargexpContext* ctx)
     auto [a, n] = GetPara();
     if (!fi->isVararg)
     {
-        // TODO error
+        throw "";
     }
     fi->EmitVararg(ctx->Line(), a, n);
     return std::any();

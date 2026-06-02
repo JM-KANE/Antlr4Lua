@@ -366,7 +366,8 @@ size_t lua::State::GetTop()
 
 int32_t lua::State::RegisterCount()
 {
-    return stack().closure->proto->MaxStackSize;
+    auto c = stack().closure;
+    return c? c->proto->MaxStackSize : 0;
 }
 
 uint8_t lua::State::GetTable(int32_t idx)
@@ -540,6 +541,16 @@ void lua::State::CloseUpvalues(int32_t n)
 
 void lua::State::Call(int32_t nArgs, int32_t nRes)
 {
+    DoCall(nArgs, nRes, false);
+}
+
+void lua::State::TailCall(int32_t nArgs)
+{
+    DoCall(nArgs, -1, true);
+}
+
+void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
+{
     auto val = stack().Get(-(nArgs + 1));
 
     Closure* c{};
@@ -562,11 +573,11 @@ void lua::State::Call(int32_t nArgs, int32_t nRes)
     {
         if (c->proto)
         {
-            CallLuaClosure(nArgs, nRes, c);
+            CallLuaClosure(nArgs, nRes, c, tail);
         }
         else
         {
-            CallFuncClosure(nArgs, nRes, c);
+            CallFuncClosure(nArgs, nRes, c, tail);
         }
     }
 
@@ -1054,12 +1065,17 @@ bool lua::State::Next(int32_t idx)
     {
         auto t = std::get<Table*>(val);
         auto k = stack().Pop();
-        if (auto nextKey = t->NextKey(*k))
+        if (auto [nextKey, ok] = t->NextKey(*k); ok)
         {
-            stack().Push(*nextKey);
-            stack().Push(*t->Get(*nextKey));
-            return true;
+            if (nextKey)
+            {
+                stack().Push(*nextKey);
+                stack().Push(*t->Get(*nextKey));
+                return true;
+            }
         }
+        else
+            Error2("invalid key to 'next'");
     }
     return false;
 }
@@ -1101,36 +1117,51 @@ std::pair<ValuePtr, bool> lua::State::CallMetamethod(Value a, Value b, const cha
     return {stack().Pop(), true};
 }
 
-void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c)
+void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool tail)
 {
     auto nRegs = c->proto->MaxStackSize;
     auto nParams = c->proto->NumParams;
     bool isVararg = c->proto->IsVararg;
-
     auto& oldStack = stack();
+    if (tail)
+    {
+        CheckStack(cv::MINSTACK + nRegs);
+        if (nArgs > nParams && isVararg)
+        {
+            oldStack.varargs = oldStack.PopN(nArgs - nParams);
+        }
+        Rotate(1, nParams);
+        oldStack.closure = c;
+        oldStack.top = nRegs;
+        oldStack.pc = 0;
+        RunLuaClosure();
+        return;
+    }
+
     auto newStack = std::make_unique<Stack>(cv::MINSTACK + nRegs, this);
-    newStack->closure = c;
     auto funcAndArgs = oldStack.PopN(nArgs + 1);
-    newStack->PushN(funcAndArgs, nParams, 1);
-    newStack->top = nRegs;  // to max
     if (nArgs > nParams && isVararg)
     {
         newStack->varargs = std::vector(std::make_move_iterator(funcAndArgs.begin() + nParams + 1),
                                         std::make_move_iterator(funcAndArgs.end()));
     }
+    newStack->PushN(funcAndArgs, nParams, 1);
+    newStack->closure = c;
+    newStack->top = nRegs;
 
     PushLuaStack(std::move(newStack));
     RunLuaClosure();
+    auto newRegs = RegisterCount();
     newStack = PopLuaStack();
     if (nRes)
     {
-        auto results = newStack->PopN(newStack->top - nRegs);
+        auto results = newStack->PopN(newStack->top - newRegs);
         stack().Check(results.size());
         stack().PushN(results, nRes);
     }
 }
 
-void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c)
+void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c, bool tail)
 {
     auto& oldStack = stack();
     auto newStack = std::make_unique<Stack>(cv::MINSTACK + nArgs, this);
@@ -1169,7 +1200,7 @@ TStatus lua::State::RunLuaClosure()
         {
             return exception->Status();
         }
-        if (inst.Opcode() == Op::RETURN)
+        if (inst.Opcode() == Op::RETURN || inst.Opcode() == Op::TAILCALL)
         {
             return TStatus::OK;
         }
@@ -1238,7 +1269,11 @@ void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
         {
             Barrier(t, k);
             Barrier(t, v);
-            tbl->Put(Value{k}, std::move(v));
+            if (auto err = tbl->Put(Value{ k }, std::move(v)))
+            {
+                auto msg = 1 == err ? "table index is nil" : "table index is NaN";
+                Error2(msg);
+            }               
             return;
         }
     }

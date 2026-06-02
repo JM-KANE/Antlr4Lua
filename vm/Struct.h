@@ -50,8 +50,8 @@ public:
 
     const ValuePtr* Get(const Value& key);
 
-    void Put(Value&& key, Value&& val);
-    const Value* NextKey(const Value& key);
+    int16_t Put(Value&& key, Value&& val);
+    std::pair<const Value*, bool> NextKey(const Value& key);
     void InitKeys();
 
     void Mark(std::vector<Value>& grey);

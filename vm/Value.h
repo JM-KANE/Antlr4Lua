@@ -62,6 +62,10 @@ struct Value : public BaseValue
     {
         return index() == 4;
     }
+    bool IsFloat() const
+    {
+        return index() == 3;
+    }
 
     static std::unique_ptr<Value> Nil();
 

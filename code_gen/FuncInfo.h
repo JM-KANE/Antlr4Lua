@@ -111,7 +111,7 @@ struct FuncInfo
     FuncInfo* parent{};
     std::vector<std::unique_ptr<FuncInfo>> subFuncs;
     slot_type usedRegs{};
-    slot_type maxRegs{128};
+    slot_type maxRegs{0};
     uint32_t scopeLv{};
     std::vector<std::unique_ptr<LocVarInfo>> locVars;
     string_ref_map<LocVarInfo*> locNames;
@@ -124,6 +124,7 @@ struct FuncInfo
     const uint32_t lastLine{};
     uint32_t numParams{};
     bool isVararg = true;
+    ErrorCollector* ec{};
 
     // FuncInfo() = default;
     FuncInfo(LuaRuleContext* node, FuncInfo* p = {});
@@ -135,6 +136,12 @@ struct FuncInfo
     slot_type AllocRegs(slot_type n);
     void FreeReg();
     void FreeRegs(slot_type n);
+
+    template<typename...Ts>
+    void Error(Ts&&...args)
+    {
+        ec->CompileError(std::forward<Ts>(args)...);
+    }
 
     void EnterScope(bool b);
     void ExitScope(size_t endPC);

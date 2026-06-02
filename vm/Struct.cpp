@@ -92,9 +92,16 @@ const ValuePtr* lua::Table::Get(const Value& key)
     return it == map.end() || it->second->IsNil() ? nullptr : &it->second;
 }
 
-void lua::Table::Put(Value&& key, Value&& val)
+int16_t lua::Table::Put(Value&& key, Value&& val)
 {
-    // TODO key error
+    if (key.IsNil())
+        return 1;
+    else if (key.IsFloat())
+    {
+        auto d = key.ConvertToFloat().first;
+        if (std::isnan(d))
+            return 2;
+    }
 
     changed = 1;
     int64_t idx = KeyToInt(key);
@@ -111,24 +118,26 @@ void lua::Table::Put(Value&& key, Value&& val)
                 // tombstone
                 ShrinkArray();
             }
-            return;
+            return 0;
         }
         if (idx == arrLen + 1)
         {
             map.erase(key);
             arr.emplace_back(std::move(valPtr));
             ExpandArray();
-            return;
+            return 0;
         }
     }
     map.insert_or_assign(std::move(key), std::move(valPtr));
+    return 0;
 }
 
-const Value* lua::Table::NextKey(const Value& key)
+std::pair<const Value*, bool> lua::Table::NextKey(const Value& key)
 {
     InitKeys();
     auto it = keys.find(key);
-    return it == keys.end() ? nullptr : it->second;
+    bool ok = it != keys.end();
+    return {ok? it->second : nullptr, ok};
 }
 
 void lua::Table::InitKeys()
@@ -137,7 +146,7 @@ void lua::Table::InitKeys()
     {
         return;
     }
-
+    keys.clear();
     changed = 0;
     for (size_t i = 0; i < arr.size(); i++)
     {
@@ -146,10 +155,6 @@ void lua::Table::InitKeys()
     for (auto&& [k, v] : map)
     {
         keys[k] = v->index() ? v.get() : nullptr;
-    }
-    if (keys.empty())
-    {
-        return;
     }
 
     using iterator = decltype(keys)::iterator;
@@ -177,21 +182,11 @@ void lua::Table::InitKeys()
         }
         befores.second = it;
     }
-    if (!first)
+    for (auto it = befores.first; it != keys.end(); ++it)
     {
-        keys.clear();
+        it->second = nullptr;
     }
-    else
-    {
-        auto next = std::next(befores.first);
-        befores.first->second = nullptr;
-        for (auto it = next; it != keys.end();)
-        {
-            it = keys.erase(it);
-        }
-        keys.emplace(nullptr, first);
-
-    }
+    keys.emplace(nullptr, first);
 }
 
 void lua::Table::Mark(std::vector<Value>& grey)
