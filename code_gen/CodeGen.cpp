@@ -2,6 +2,7 @@
 #include "number.h"
 #include "LuaLexer.h"
 #include "LuaParser.h"
+#include "IncompleteErrorStrategy.h"
 
 using namespace lua;
 using namespace lua::number;
@@ -424,13 +425,40 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     antlr4::CommonTokenStream tokens(&lexer);
     LuaParser parser(&tokens);
     parser.addErrorListener(&proto.ec);
-    auto chunk = parser.chunk();
+    return GenerateProto(parser, proto);
+}
+
+std::pair<TStatus, bool> lua::CodeGen::GenerateREPL(const std::string& data, TopPrototype& proto)
+{
+    antlr4::ANTLRInputStream input(data);
+    LuaLexer lexer(&input);
+    lexer.addErrorListener(&proto.ec);
+    antlr4::CommonTokenStream tokens(&lexer);
+    LuaParser parser(&tokens);
+    parser.addErrorListener(&proto.ec);
+    parser.SetREPL();
+    auto errStrategy = std::make_shared<IncompleteErrorStrategy>();
+    parser.setErrorHandler(errStrategy);
+
+    auto st = GenerateProto(parser, proto);
+    return {st, errStrategy->InComplete()};
+}
+
+TStatus lua::CodeGen::GenerateProto(LuaParser& parser, TopPrototype& proto)
+{
+    auto start = parser.start_();
     if (proto.ec.HasErrors())
     {
         return TStatus::LUA_ERRSYNTAX;
     }
 
-    GenerateProto(chunk, proto);
+    auto ck = start->chunk();
+    root = std::make_unique<FuncInfo>(ck);
+    root->ec = &proto.ec;
+    root->AddLocVar(str::ENV, 0);
+    fi = root.get();
+    ck->accept(this);
+    root->subFuncs.front()->ToProto(proto);
     if (proto.ec.HasErrors())
     {
         return TStatus::LUA_ERRSYNTAX;
@@ -439,14 +467,67 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     return TStatus::LUA_OK;
 }
 
-void lua::CodeGen::GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto)
+void lua::CodeGen::DoReturn(const std::vector<LuaParser::ExpContext*>& exps, uint32_t line)
 {
-    root = std::make_unique<FuncInfo>(ck);
-    root->ec = &proto.ec;
-    root->AddLocVar(str::ENV, 0);
-    fi = root.get();
-    visitChunk(ck);
-    root->subFuncs.front()->ToProto(proto);
+    auto sz = exps.size();
+    if (!sz)
+    {
+        fi->EmitReturn(line, 0, 0);
+        return;
+    }
+    if (1 == sz)
+    {
+        auto exp = exps.front();
+        if (exp->getAltNumber() == size_t(LuaRuleContext::Exp::Prefixexp_))
+        {
+            auto pre = static_cast<LuaParser::Prefixexp_Context*>(exp)->prefixexp();
+            switch (pre->getAltNumber())
+            {
+            case 1:
+            {
+                auto ni = static_cast<LuaParser::NameindexContext*>(pre);
+                if (ni->member().empty())
+                {
+                    auto name = ni->NAME()->getText();
+                    if (auto r = fi->SlotOfLocVar(name); r >= 0)
+                    {
+                        fi->EmitReturn(line, r, 1);
+                        return;
+                    }
+                }
+            }
+            break;
+            case 2:
+            {
+                auto fci = static_cast<LuaParser::CallindexContext*>(pre);
+                if (fci->member().empty())
+                {
+                    auto r = fi->AllocReg();
+                    auto fc = fci->functioncall();
+                    auto nArgs = PrepFuncCall(fc, r);
+                    fi->EmitTailCall(fc->Line(), r, nArgs);
+                    fi->FreeReg();
+                    fi->EmitReturn(line, r, -1);
+                    return;
+                }
+            }
+            break;
+            default:
+                break;
+            }
+        }
+    }
+
+    auto multRet = IsVarargOrFuncCall(exps.back());
+    for (size_t i = 0; i < sz; i++)
+    {
+        auto r = fi->AllocReg();
+        VisitWithPara(r, i + 1 == sz && multRet ? -1 : 1, exps[i]);
+    }
+
+    auto nExps = (slot_type)sz;
+    fi->FreeRegs(nExps);
+    fi->EmitReturn(line, fi->usedRegs, multRet ? -1 : nExps);
 }
 
 std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self)
@@ -483,7 +564,7 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
     return std::any();
 }
 
-std::any lua::CodeGen::visitChunk(LuaParser::ChunkContext* ctx)
+std::any lua::CodeGen::visitNormalblock(LuaParser::NormalblockContext* ctx)
 {
     auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(ctx, fi));
     fi = &subFi;
@@ -516,67 +597,18 @@ std::any lua::CodeGen::visitBlock(LuaParser::BlockContext* ctx)
 std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
 {
     auto exps = ctx->explist()->exp();
-    auto sz = exps.size();
-    if (!sz)
-    {
-        fi->EmitReturn(ctx->LastLine(), 0, 0);
-        return {};
-    }
-    if (1 == sz)
-    {
-        auto exp = exps.front();
-        if (exp->getAltNumber() == size_t(LuaRuleContext::Exp::Prefixexp_))
-        {
-            auto pre = static_cast<LuaParser::Prefixexp_Context*>(exp)->prefixexp();
-            switch (pre->getAltNumber())
-            {
-            case 1:
-            {
-                auto ni = static_cast<LuaParser::NameindexContext*>(pre);
-                if (ni->member().empty())
-                {
-                    auto name = ni->NAME()->getText();
-                    if (auto r = fi->SlotOfLocVar(name); r >= 0)
-                    {
-                        fi->EmitReturn(ctx->LastLine(), r, 1);
-                        return {};
-                    }
-                }
-            }
-            break;
-            case 2:
-            {
-                auto fci = static_cast<LuaParser::CallindexContext*>(pre);
-                if (fci->member().empty())
-                {
-                    auto r = fi->AllocReg();
-                    auto fc = fci->functioncall();
-                    auto nArgs = PrepFuncCall(fc, r);
-                    fi->EmitTailCall(fc->Line(), r, nArgs);
-                    fi->FreeReg();
-                    fi->EmitReturn(ctx->LastLine(), r, -1);
-                    return {};
-                }
-            }
-            break;
-            default:
-                break;
-            }
-        }
-    }
+    DoReturn(exps, ctx->LastLine());
+    return std::any();
+}
 
-    auto multRet = IsVarargOrFuncCall(exps.back());
-    for (size_t i = 0; i < sz; i++)
-    {
-        auto r = fi->AllocReg();
-        // visitExp(exps[i], r, i + 1 == sz && multRet ? -1 : 1);
-        VisitWithPara(r, i + 1 == sz && multRet ? -1 : 1, exps[i]);
-    }
-
-    auto nExps = (slot_type)sz;
-    fi->FreeRegs(nExps);
-    fi->EmitReturn(ctx->LastLine(), fi->usedRegs, multRet ? -1 : nExps);
-
+std::any lua::CodeGen::visitEvalexpblock(LuaParser::EvalexpblockContext* ctx)
+{
+    auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(ctx, fi));
+    fi = &subFi;
+    DoReturn({ctx->exp()}, ctx->LastLine());
+    fi = subFi.parent;
+    subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
+    subFi.EmitReturn(ctx->LastLine(), 0, 0);
     return std::any();
 }
 

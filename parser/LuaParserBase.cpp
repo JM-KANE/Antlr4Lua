@@ -22,3 +22,8 @@ bool LuaParserBase::IsFunctionCall()
         return false;
     return true;
 }
+
+void LuaParserBase::SetREPL()
+{
+    interactive = true;
+}

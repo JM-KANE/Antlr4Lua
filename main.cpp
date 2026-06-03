@@ -12,15 +12,11 @@ int main(int argc, const char* argv[])
     SetConsoleOutputCP(CP_UTF8);
 #endif
 
+    VirtualMachine vm(argc, argv);
     if (argc > 1)
-    {
-        VirtualMachine vm(argc, argv);
         vm.Run();
-    }
     else
-    {
-        /* code */
-    }
+        vm.RunREPL();
 
     return 0;
 }

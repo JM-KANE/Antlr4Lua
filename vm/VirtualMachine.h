@@ -145,15 +145,19 @@ private:
 
 public:
     int64_t argc;
+    bool repl{};
     const char** argv;
     std::ostream* out = &std::cout;
     std::ostream* err = &std::cerr;
+    std::istream* in = &std::cin;
     std::vector<std::unique_ptr<TopPrototype>> topProtos;
     Collector gc;
 
     VirtualMachine(int argc, const char** argv);
     void Run();
-    void PrintSyntaxError();
+    void RunREPL();
+    void SetREPL();
+    bool REPL() const;
 
     TopPrototype& NewProto();
     Closure& NewLuaClosure(const Prototype& p);

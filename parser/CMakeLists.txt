@@ -31,6 +31,8 @@ set(LUA_BASE
     ${PARSER_DIR}/LuaRuleContext.h
     ${PARSER_DIR}/ErrorCollector.cpp
     ${PARSER_DIR}/ErrorCollector.h
+    ${PARSER_DIR}/IncompleteErrorStrategy.cpp
+    ${PARSER_DIR}/IncompleteErrorStrategy.h
 )
 
 # set(ANTLR java -Xmx500M -cp "/usr/local/lib/antlr-4.13.2-complete.jar" org.antlr.v4.Tool)

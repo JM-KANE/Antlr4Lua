@@ -55,14 +55,16 @@ public:
     slot_type VisitMember(LuaParser::MemberContext* member);
 
     TStatus Generate(const std::string& data, TopPrototype& proto);
-    void GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto);
+    std::pair<TStatus, bool> GenerateREPL(const std::string& data, TopPrototype& proto);
+    TStatus GenerateProto(LuaParser& parser, TopPrototype& proto);
 
+    void DoReturn(const std::vector<LuaParser::ExpContext*>& exps, uint32_t line);
     std::any DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self);
-    std::any visitChunk(LuaParser::ChunkContext* ctx) override;
+    std::any visitNormalblock(LuaParser::NormalblockContext* ctx) override;
     std::any visitFuncbody(LuaParser::FuncbodyContext* ctx) override;
     std::any visitBlock(LuaParser::BlockContext* ctx) override;
     std::any visitRetstat(LuaParser::RetstatContext* ctx) override;
-    // void visitExp(LuaParser::ExpContext* ctx, slot_type a, slot_type n);
+    std::any visitEvalexpblock(LuaParser::EvalexpblockContext* ctx) override;
 
     void DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names, uint32_t line);
     std::any visitAssign(LuaParser::AssignContext* ctx) override;

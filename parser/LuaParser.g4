@@ -20,11 +20,17 @@ options {
 }
 
 start_
-    : chunk
+    : chunk chunkend
     ;
 
 chunk
-    : block EOF
+    : block                 # normalblock
+    | {interactive}? exp    # evalexpblock
+    |                       # emptyblock
+    ;
+
+chunkend
+    : EOF
     ;
 
 block

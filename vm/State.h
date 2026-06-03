@@ -23,8 +23,10 @@ struct State
 
     std::ostream& Out() const;
     std::ostream& Err() const;
+    std::istream& In() const;
 
     TStatus Load(const std::string& data, std::string chunkName, std::string_view mode);
+    std::pair<TStatus, bool> LoadStream(const std::string& data);
     TStatus LoadFile(std::string_view filename);
     TStatus LoadFileX(std::string_view filename, std::string_view mode);
 

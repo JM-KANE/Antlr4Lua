@@ -237,7 +237,6 @@ void lua::VirtualMachine::Run()
     // throw compile error
     if (status != TStatus::LUA_OK)
     {
-        // main.status = status;
         main.Throw();
         return;
     }
@@ -255,9 +254,73 @@ void lua::VirtualMachine::Run()
     main.Throw();
 }
 
-void lua::VirtualMachine::PrintSyntaxError()
+void lua::VirtualMachine::RunREPL()
 {
-    topProtos.front()->PrintError(*err);
+    SetREPL();
+    main.OpenLibs();
+    Value* printer{};
+    std::string line;
+    std::string chunk;
+    (*out) << "> ";
+    while (std::getline(*in, line))
+    {
+        chunk += line + '\n';
+        auto [status, inComplete] = main.LoadStream(chunk);
+        if (status != TStatus::LUA_OK)
+        {
+            if (inComplete)
+            {
+                main.exception.reset();
+                (*out) << '>';
+            }
+            else
+            {
+                chunk.clear();
+                main.Throw();
+            }
+            (*out) << "> "; 
+            continue;   
+        }
+        chunk.clear();
+        main.SetEnv(0);
+        main.Call(0, cv::LUA_MULTRET);
+        if (!printer)
+        {
+            printer = global.Get("print")->get();
+            //if (!printer)
+            //{
+            //    // new print
+            //}
+        }
+        auto nArgs = (int32_t)main.GetTop();
+        main.PushAny(*printer);
+        main.Insert(1);
+        std::ostringstream os;
+        out = &os;
+        main.Call(nArgs, 0);
+        out = &std::cout;
+        if (main.exception)
+            main.Throw();
+        else
+        {
+            auto str = os.str();
+            if (str.size() > 1)
+            {
+                (*out) << str;
+            }
+        }
+        (*out) << "> ";
+    }
+}
+
+void lua::VirtualMachine::SetREPL()
+{
+    repl = true;
+}
+
+bool lua::VirtualMachine::REPL() const
+{
+    return true;
 }
 
 TopPrototype& lua::VirtualMachine::NewProto()

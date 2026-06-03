@@ -43,6 +43,11 @@ std::ostream& lua::State::Err() const
     return *vm->err;
 }
 
+std::istream& lua::State::In() const
+{
+    return *vm->in;
+}
+
 TStatus lua::State::Load(const std::string& data, std::string chunkName, std::string_view mode)
 {
     auto& p = vm->NewProto();
@@ -66,6 +71,25 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
         return st;
     }
 
+    auto& c = vm->NewLuaClosure(p);
+    stack().Push(&c);
+    return st;
+}
+
+std::pair<TStatus, bool> lua::State::LoadStream(const std::string& data)
+{
+    auto& p = vm->NewProto();
+    p.Source = "=stdin";
+    CodeGen cg;
+    auto st = cg.GenerateREPL(data, p);
+    if (st.first != TStatus{})
+    {
+        if (TStatus::LUA_ERRSYNTAX == st.first)
+        {
+            MakeError<SyntaxException>(&p, std::move(p.ec.GetErrors().front()));
+        }
+        return st;
+    }
     auto& c = vm->NewLuaClosure(p);
     stack().Push(&c);
     return st;
@@ -587,6 +611,7 @@ void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
     if (!c)
     {
         Error2("attempt to call a %s value", TypeName(val.TypeOf()));
+        Pop(nArgs + 1);
         if (nRes > 0)
             stack().Check(nRes);       
     }
@@ -663,7 +688,8 @@ void lua::State::Throw()
 {
     if (exception)
     {
-        Err() << vm->argv[0] << ": ";
+        if (!vm->REPL())
+            Err() << vm->argv[0] << ": ";
         status = Catch(Err());
         Err() << std::endl;
     }

@@ -12,10 +12,12 @@ class LuaParserBase : public antlr4::Parser
 {
 
 protected:
+    bool interactive = false;
     LuaParserBase(antlr4::TokenStream* input);
 
 public:
     bool IsFunctionCall();
+    void SetREPL();
 };
 }  // namespace lua
 #endif
