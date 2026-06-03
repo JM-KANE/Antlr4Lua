@@ -47,7 +47,7 @@ struct Value : public BaseValue
     uint8_t TypeOf() const;
 
     Value ConvertToNumber() const;
-    std::pair<int64_t, bool> ConvertToInteger() const;
+    std::pair<int64_t, bool> ConvertToInteger(bool considerStr = true) const;
     std::pair<double, bool> ConvertToFloat() const;
     bool ConvertToBoolean() const;
 

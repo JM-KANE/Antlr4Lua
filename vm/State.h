@@ -3,14 +3,10 @@
 
 #include "Stack.h"
 #include "../code_gen/LuaException.h"
+#include "Operator.h"
 namespace lua
 {
-namespace op
-{
-struct Le;
-struct Eq;
-struct bitbase;
-}  // namespace op
+
 class VirtualMachine;
 struct State
 {
@@ -137,26 +133,26 @@ struct State
             a = std::move(*stack().Pop());
         else
             a = std::move(b);
-        constexpr auto bit = std::is_base_of_v<typename OP::cop_type, op::bitbase>;
+        constexpr auto bit = std::is_base_of_v<op::bitbase, typename OP::cop_type>;
         if constexpr (bit)
         {
-            auto [ai, ok] = a.ConvertToInteger();
+            auto [ai, ok] = a.ConvertToInteger(false);
             if (ok)
                 a = ai;
         }
-        else
-            a = a.ConvertToNumber();
+        else if (auto cvt = a.ConvertToNumber(); !cvt.IsNil())
+            a = cvt;
         Value res;
         if constexpr (OP::num_param == 2)
         {
             if constexpr (bit)
             {
-                auto [bi, ok] = a.ConvertToInteger();
+                auto [bi, ok] = b.ConvertToInteger(false);
                 if (ok)
                     b = bi;
             }
-            else
-                b = b.ConvertToNumber();
+            else if (auto cvt = b.ConvertToNumber(); !cvt.IsNil())
+                b = cvt;
             res = std::visit(OP(), a, b);
         }
         else
@@ -169,6 +165,8 @@ struct State
         if constexpr (OP::num_param == 1)
             b = Value{};
         constexpr auto mm = OP::field_name;
+        auto at = a.TypeOf();
+        auto bt = b.TypeOf();
         auto [resM, ok] = CallMetamethod(std::move(a), std::move(b), mm);  // unary op
         if (ok)
         {
@@ -179,7 +177,7 @@ struct State
         if (!exception)
         {
             const char* opName{};
-            if constexpr (std::is_base_of_v<typename OP::cop_type, op::bitbase>)
+            if constexpr (bit)
             {
                 if (a.index() == 3 || b.index() == 3)
                 {
@@ -190,7 +188,6 @@ struct State
             }
             else
                 opName = "arithmetic";
-            auto at = a.TypeOf();
             auto fmt = "attempt to perform %s on a %s value";
             if (cv::type::LUA_TNUMBER != at)
             {
@@ -198,7 +195,6 @@ struct State
             }
             else if constexpr (OP::num_param == 2)
             {
-                auto bt = b.TypeOf();
                 if (cv::type::LUA_TNUMBER != bt)
                 {
                     Error2(fmt, opName, TypeName(bt));

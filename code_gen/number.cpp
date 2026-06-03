@@ -28,12 +28,12 @@ std::variant<std::nullptr_t, int64_t, double> ToNum(const std::string& s)
     if (isHex)
     {
         auto i = ToHex(str, &res);
-        if (res.ec == std::errc{})
+        if (res.ec == std::errc{} && 0 == res.ptr[0])
         {
             return i;
         }
         auto d = ToHexFloat(str, &res);
-        if (res.ec == std::errc{})
+        if (res.ec == std::errc{} && 0 == res.ptr[0])
         {
             return d;
         }
@@ -41,12 +41,12 @@ std::variant<std::nullptr_t, int64_t, double> ToNum(const std::string& s)
     else
     {
         auto i = ToInt(str, &res);
-        if (res.ec == std::errc{})
+        if (res.ec == std::errc{} && 0 == res.ptr[0])
         {
             return i;
         }
         auto d = ToFloat(str, &res);
-        if (res.ec == std::errc{})
+        if (res.ec == std::errc{} && 0 == res.ptr[0])
         {
             return d;
         }

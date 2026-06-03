@@ -14,11 +14,10 @@ uint32_t lua::Stack::CurrentLine() const
 
 void lua::Stack::Check(size_t n)
 {
-    if (n > cv::LUAI_MAXSTACK)
+    if (top + n > cv::LUAI_MAXSTACK)
     {
         state->Error2("stack overflow!");
     }
-
     auto free = slots.size() - top;
     for (size_t i = free; i < n; i++)
     {

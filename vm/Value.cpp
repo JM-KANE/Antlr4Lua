@@ -54,9 +54,9 @@ Value lua::Value::ConvertToNumber() const
         *this);
 }
 
-std::pair<int64_t, bool> lua::Value::ConvertToInteger() const
+std::pair<int64_t, bool> lua::Value::ConvertToInteger(bool considerStr) const
 {
-    auto v = ConvertToNumber();
+    const auto& v = considerStr ? ConvertToNumber() : *this;
     return std::visit(
         [](auto&& arg) -> std::pair<int64_t, bool>
         {

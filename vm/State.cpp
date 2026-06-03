@@ -572,7 +572,8 @@ void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
     if (!c)
     {
         Error2("attempt to call a %s value", TypeName(val.TypeOf()));
-        // TODO result number
+        if (nRes > 0)
+            stack().Check(nRes);       
     }
     else if (c->proto)
     {
@@ -582,8 +583,6 @@ void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
     {
         CallFuncClosure(nArgs, nRes, c, tail);
     }
-
-    // TODO error
 }
 
 TStatus lua::State::PCall(int32_t nArgs, int32_t nRes, int32_t msgh)
@@ -1141,12 +1140,13 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
     auto& oldStack = stack();
     if (tail)
     {
-        CheckStack(cv::LUA_MINSTACK + nRegs);
         if (nArgs > nParams && isVararg)
         {
             oldStack.varargs = oldStack.PopN(nArgs - nParams);
         }
         Rotate(1, nParams);
+        oldStack.top = 0;
+        CheckStack(cv::LUA_MINSTACK + nRegs);
         oldStack.closure = c;
         oldStack.top = nRegs;
         oldStack.pc = 0;
@@ -1167,11 +1167,23 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
 
     PushLuaStack(std::move(newStack));
     RunLuaClosure();
-    auto newRegs = RegisterCount();
+
+    bool changeToFunctionTail = !stack().closure->proto;
+    auto newRegs = changeToFunctionTail ? 0: RegisterCount();
     newStack = PopLuaStack();
     if (nRes)
     {
-        auto results = newStack->PopN(newStack->top - newRegs);
+        std::vector<ValuePtr> results;
+        if (changeToFunctionTail)
+        {
+            auto total = newStack->Pop();
+            auto nTotal = total->ConvertToInteger().first;
+            results = newStack->PopN(nTotal);
+        }
+        else
+        {   
+            results = newStack->PopN(newStack->top - newRegs);
+        }
         stack().Check(results.size());
         stack().PushN(results, nRes);
     }
@@ -1180,6 +1192,18 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
 void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c, bool tail)
 {
     auto& oldStack = stack();
+    if (tail)
+    {
+        Rotate(1, nArgs);
+        oldStack.top = 0;
+        CheckStack(cv::LUA_MINSTACK + nArgs);
+        oldStack.closure = c;
+        oldStack.top = nArgs;
+        oldStack.pc = 0;
+        c->func(this);
+        oldStack.Push((int64_t)oldStack.top - nArgs);
+        return;
+    }
     auto newStack = std::make_unique<Stack>(cv::LUA_MINSTACK + nArgs, this);
     newStack->closure = c;
     if (nArgs > 0)
