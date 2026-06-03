@@ -6,17 +6,6 @@
 namespace lua
 {
 
-namespace cv
-{
-constexpr auto MINSTACK = 20;
-constexpr auto MAXSTACK = 1'000'000;
-constexpr auto REGISTRYINDEX = -MAXSTACK - 1000;
-
-constexpr int64_t RIDX_MAINTHREAD = 1;
-constexpr int64_t RIDX_GLOBALS = 2;
-constexpr int64_t MULTRET = -1;
-}  // namespace cv
-
 struct State;
 struct Table;
 struct Closure;
@@ -27,20 +16,6 @@ using is_lua_number = std::conjunction<
     std::disjunction<std::is_same<std::decay_t<Ts>, int64_t>, std::is_same<std::decay_t<Ts>, double>>...>;
 template <typename... Ts>
 static constexpr bool is_lua_number_v = is_lua_number<Ts...>::value;
-
-namespace type
-{
-constexpr uint8_t NIL = 0;
-constexpr uint8_t BOOLEAN = 1;
-constexpr uint8_t LIGHTUSERDATA = 2;
-constexpr uint8_t NUMBER = 3;
-constexpr uint8_t STRING = 4;
-constexpr uint8_t TABLE = 5;
-constexpr uint8_t FUNCTION = 6;
-constexpr uint8_t USERDATA = 7;
-constexpr uint8_t THREAD = 8;
-constexpr uint8_t NONE = -1;
-}  // namespace type
 
 struct Value : public BaseValue
 {

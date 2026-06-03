@@ -14,6 +14,11 @@ uint32_t lua::Stack::CurrentLine() const
 
 void lua::Stack::Check(size_t n)
 {
+    if (n > cv::LUAI_MAXSTACK)
+    {
+        state->Error2("stack overflow!");
+    }
+
     auto free = slots.size() - top;
     for (size_t i = free; i < n; i++)
     {
@@ -25,7 +30,7 @@ Value& lua::Stack::Push(ValuePtr&& val)
 {
     if (top == slots.size())
     {
-        // TODO error
+        state->Error2("stack overflow!");
     }
     state->Barrier(state, *val);
     slots[top] = std::move(val);
@@ -44,7 +49,7 @@ ValuePtr lua::Stack::Pop()
 {
     if (top < 1)
     {
-        // TODO error
+        return nullptr;
     }
 
     --top;
@@ -98,7 +103,7 @@ std::vector<ValuePtr> lua::Stack::PopN(int64_t n)
 
 size_t lua::Stack::AbsIndex(int64_t idx) const
 {
-    if (idx >= 0 || idx <= cv::REGISTRYINDEX)
+    if (idx >= 0 || idx <= cv::LUA_REGISTRYINDEX)
     {
         return idx;
     }
@@ -107,16 +112,16 @@ size_t lua::Stack::AbsIndex(int64_t idx) const
 
 Value lua::Stack::Get(int64_t idx) const
 {
-    if (idx < cv::REGISTRYINDEX)
+    if (idx < cv::LUA_REGISTRYINDEX)
     {
-        auto uvIdx = cv::REGISTRYINDEX - idx - 1;
+        auto uvIdx = cv::LUA_REGISTRYINDEX - idx - 1;
         if (!closure || uvIdx >= (int64_t)closure->upvals.size())
         {
             return nullptr;
         }
         return *closure->upvals[uvIdx]->val;
     }
-    if (idx == cv::REGISTRYINDEX)
+    if (idx == cv::LUA_REGISTRYINDEX)
     {
         return &state->registry;
     }
@@ -130,18 +135,18 @@ Value lua::Stack::Get(int64_t idx) const
 
 void lua::Stack::Set(int64_t idx, Value val)
 {
-    if (idx < cv::REGISTRYINDEX)
+    if (idx < cv::LUA_REGISTRYINDEX)
     {
-        auto uvIdx = cv::REGISTRYINDEX - idx - 1;
+        auto uvIdx = cv::LUA_REGISTRYINDEX - idx - 1;
         if (closure && uvIdx < (int64_t)closure->upvals.size())
         {
             *closure->upvals[uvIdx]->val = std::move(val);
         }
         return;
     }
-    if (idx == cv::REGISTRYINDEX)
+    if (idx == cv::LUA_REGISTRYINDEX)
     {
-        // TODO error
+        state->Error2("modifying the registry is forbidden");
         return;
     }
     auto absIdx = AbsIndex(idx);
@@ -163,12 +168,12 @@ void lua::Stack::Reverse(size_t from, size_t to)
 
 bool lua::Stack::IsValid(int32_t idx) const
 {
-    if (idx < cv::REGISTRYINDEX)
+    if (idx < cv::LUA_REGISTRYINDEX)
     {
-        auto uvIdx = cv::REGISTRYINDEX - idx - 1;
+        auto uvIdx = cv::LUA_REGISTRYINDEX - idx - 1;
         return closure && uvIdx < closure->upvals.size();
     }
-    if (idx == cv::REGISTRYINDEX)
+    if (idx == cv::LUA_REGISTRYINDEX)
     {
         return true;
     }

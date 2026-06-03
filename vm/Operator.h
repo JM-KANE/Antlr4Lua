@@ -46,8 +46,12 @@ struct power
         return std::pow(double(a), double(b));
     }
 };
+
+struct bitbase
+{
+};
 template <typename COP>
-struct bitwise
+struct bitwise : bitbase
 {
     int64_t operator()(int64_t a, int64_t b) const
     {
@@ -75,7 +79,7 @@ struct bit_xor : bitwise<std::bit_xor<>>
 struct bit_not : bitwise<std::bit_not<>>
 {
 };
-struct shift_left
+struct shift_left : bitbase
 {
     int64_t operator()(int64_t a, int64_t b) const
     {
@@ -86,7 +90,7 @@ struct shift_left
         return nullptr;
     }
 };
-struct shift_right
+struct shift_right : bitbase
 {
     auto operator()(auto a, auto b) const
     {
@@ -99,6 +103,7 @@ struct shift_right
 template <size_t N, typename COP>
 struct ArithOperator
 {
+    using cop_type = COP;
     static constexpr auto num_param = N;
 
     template <typename... Ts>

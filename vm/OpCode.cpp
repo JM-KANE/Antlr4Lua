@@ -69,7 +69,7 @@ void loadNil(Instruction i, State* ls)
 void getUpval(Instruction i, State* ls)
 {
     auto [a, b, _] = i.ABC();
-    ls->Copy(cv::REGISTRYINDEX - (b + 1), a + 1);
+    ls->Copy(cv::LUA_REGISTRYINDEX - (b + 1), a + 1);
 }
 // R(A) := UpValue[B][RK(C)]
 void getTabUp(Instruction i, State* ls)
@@ -78,7 +78,7 @@ void getTabUp(Instruction i, State* ls)
     ++a;
     ++b;
     ls->GetRK(c);
-    ls->GetTable(cv::REGISTRYINDEX - b);
+    ls->GetTable(cv::LUA_REGISTRYINDEX - b);
     ls->Replace(a);
 }
 // R(A) := R(B)[RK(C)]
@@ -98,13 +98,13 @@ void setTabUp(Instruction i, State* ls)
     ++a;
     ls->GetRK(b);
     ls->GetRK(c);
-    ls->SetTable(cv::REGISTRYINDEX - a);
+    ls->SetTable(cv::LUA_REGISTRYINDEX - a);
 }
 // UpValue[B] := R(A)
 void setUpval(Instruction i, State* ls)
 {
     auto [a, b, _] = i.ABC();
-    ls->Copy(a + 1, cv::REGISTRYINDEX - (b + 1));
+    ls->Copy(a + 1, cv::LUA_REGISTRYINDEX - (b + 1));
 }
 // R(A)[RK(B)] := RK(C)
 void setTable(Instruction i, State* ls)

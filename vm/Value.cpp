@@ -16,19 +16,19 @@ uint8_t lua::Value::TypeOf() const
         {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, bool>)
-                return type::BOOLEAN;
+                return cv::type::LUA_TBOOLEAN;
             else if constexpr (is_lua_number_v<T>)
-                return type::NUMBER;
+                return cv::type::LUA_TNUMBER;
             else if constexpr (std::is_same_v<T, std::string>)
-                return type::STRING;
+                return cv::type::LUA_TSTRING;
             else if constexpr (std::is_same_v<T, Table*>)
-                return type::TABLE;
+                return cv::type::LUA_TTABLE;
             else if constexpr (std::is_same_v<T, Closure*>)
-                return type::FUNCTION;
+                return cv::type::LUA_TFUNCTION;
             else if constexpr (std::is_same_v<T, State*>)
-                return type::THREAD;
+                return cv::type::LUA_TUSERDATA;
             else
-                return type::NIL;
+                return cv::type::LUA_TNIL;
         },
         *this);
 }

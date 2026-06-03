@@ -12,39 +12,6 @@ namespace lua
 {
 using slot_type = int16_t;
 
-namespace str
-{
-constexpr char ENV[] = "_ENV";
-
-constexpr char INDEX[] = "__index";
-constexpr char CALL[] = "__call";
-constexpr char NEWINDEX[] = "__newindex";
-constexpr char ADD[] = "__add";
-constexpr char SUB[] = "__sub";
-constexpr char MUL[] = "__mul";
-constexpr char MOD[] = "__mod";
-constexpr char POW[] = "__pow";
-constexpr char DIV[] = "__div";
-constexpr char IDIV[] = "__idiv";
-constexpr char BAND[] = "__band";
-constexpr char BOR[] = "__bor";
-constexpr char BXOR[] = "__bxor";
-constexpr char SHL[] = "__shl";
-constexpr char SHR[] = "__shr";
-constexpr char UNM[] = "__unm";
-constexpr char BNOT[] = "__bnot";
-constexpr char LEN[] = "__len";
-constexpr char CONCAT[] = "__concat";
-constexpr char EQ[] = "__eq";
-constexpr char LT[] = "__lt";
-constexpr char LE[] = "__le";
-constexpr char NAME[] = "__name";
-constexpr char PAIRS[] = "__pairs";
-constexpr char METATABLE[] = "__metatable";
-constexpr char TOSTRING[] = "__tostring";
-
-}  // namespace str
-
 // TODO chunk and header
 struct TopPrototype;
 struct Prototype
@@ -137,8 +104,8 @@ struct FuncInfo
     void FreeReg();
     void FreeRegs(slot_type n);
 
-    template<typename...Ts>
-    void Error(Ts&&...args)
+    template <typename... Ts>
+    void Error(Ts&&... args)
     {
         ec->CompileError(std::forward<Ts>(args)...);
     }

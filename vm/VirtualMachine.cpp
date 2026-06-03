@@ -224,9 +224,9 @@ lua::VirtualMachine::VirtualMachine(int _argc, const char** _argv)
       global(0, 20),
       main(this, registry)
 {
-    main.registry.Put(cv::RIDX_MAINTHREAD, &main);
-    main.registry.Put(cv::RIDX_GLOBALS, &global);
-    main.PushLuaStack(cv::MINSTACK, &main);
+    main.registry.Put(cv::LUA_RIDX_MAINTHREAD, &main);
+    main.registry.Put(cv::LUA_RIDX_GLOBALS, &global);
+    main.PushLuaStack(cv::LUA_MINSTACK, &main);
 }
 
 void lua::VirtualMachine::Run()
@@ -235,7 +235,7 @@ void lua::VirtualMachine::Run()
     auto status = main.LoadFile(argv[1]);
 
     // throw compile error
-    if (status != TStatus::OK)
+    if (status != TStatus::LUA_OK)
     {
         // main.status = status;
         main.Throw();

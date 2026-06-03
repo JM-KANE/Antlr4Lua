@@ -1,5 +1,5 @@
-// #include "State.h"
 #include "Struct.h"
+#include "cmath"
 
 using namespace lua;
 
@@ -137,7 +137,7 @@ std::pair<const Value*, bool> lua::Table::NextKey(const Value& key)
     InitKeys();
     auto it = keys.find(key);
     bool ok = it != keys.end();
-    return {ok? it->second : nullptr, ok};
+    return {ok ? it->second : nullptr, ok};
 }
 
 void lua::Table::InitKeys()

@@ -8,6 +8,8 @@ namespace lua
 namespace op
 {
 struct Le;
+struct Eq;
+struct bitbase;
 }  // namespace op
 class VirtualMachine;
 struct State
@@ -125,24 +127,36 @@ struct State
     void DoCall(int32_t nArgs, int32_t nRes, bool tail = true);
     TStatus PCall(int32_t nArgs, int32_t nRes, int32_t msgh);
     bool CallMeta(int obj, std::string_view event);
+
     template <typename OP>
     void Arith()
     {
         auto b = std::move(*stack().Pop());
         Value a;
         if constexpr (OP::num_param == 2)
-        {
             a = std::move(*stack().Pop());
+        else
+            a = std::move(b);
+        constexpr auto bit = std::is_base_of_v<typename OP::cop_type, op::bitbase>;
+        if constexpr (bit)
+        {
+            auto [ai, ok] = a.ConvertToInteger();
+            if (ok)
+                a = ai;
         }
         else
-        {
-            a = std::move(b);
-        }
-        a = a.ConvertToNumber();
+            a = a.ConvertToNumber();
         Value res;
         if constexpr (OP::num_param == 2)
         {
-            b = b.ConvertToNumber();
+            if constexpr (bit)
+            {
+                auto [bi, ok] = a.ConvertToInteger();
+                if (ok)
+                    b = bi;
+            }
+            else
+                b = b.ConvertToNumber();
             res = std::visit(OP(), a, b);
         }
         else
@@ -161,9 +175,38 @@ struct State
             stack().Push(std::move(resM));
             return;
         }
-
-        // TODO error;
+        PushNil();
+        if (!exception)
+        {
+            const char* opName{};
+            if constexpr (std::is_base_of_v<typename OP::cop_type, op::bitbase>)
+            {
+                if (a.index() == 3 || b.index() == 3)
+                {
+                    Error2("number has no integer representation");
+                    return;
+                }
+                opName = "bitwise";
+            }
+            else
+                opName = "arithmetic";
+            auto at = a.TypeOf();
+            auto fmt = "attempt to perform %s on a %s value";
+            if (cv::type::LUA_TNUMBER != at)
+            {
+                Error2(fmt, opName, TypeName(at));
+            }
+            else if constexpr (OP::num_param == 2)
+            {
+                auto bt = b.TypeOf();
+                if (cv::type::LUA_TNUMBER != bt)
+                {
+                    Error2(fmt, opName, TypeName(bt));
+                }
+            }
+        }
     }
+
     template <typename OP>
     bool Compare(int32_t idx1, int32_t idx2)
     {
@@ -180,12 +223,26 @@ struct State
                 {
                     return res->ConvertToBoolean();
                 }
+                else if constexpr (std::is_same_v<op::Eq, OP>)
+                {
+                    return false;
+                }
+
                 if constexpr (std::is_same_v<op::Le, OP>)
                 {
                     if (auto [res, ok] = CallMetamethod(b, a, str::LT); ok)
                     {
                         return !res->ConvertToBoolean();
                     }
+                }
+                if (!exception)
+                {
+                    auto at = a.TypeOf();
+                    auto bt = b.TypeOf();
+                    if (at == bt)
+                        Error2("attempt to compare two %s values", TypeName(at), TypeName(bt));
+                    else
+                        Error2("attempt to compare %s with %s", TypeName(at), TypeName(bt));
                 }
             }
             else

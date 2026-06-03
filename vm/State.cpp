@@ -59,7 +59,7 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
     }
     if (st != TStatus{})
     {
-        if (TStatus::ERRSYNTAX == st)
+        if (TStatus::LUA_ERRSYNTAX == st)
         {
             MakeError<SyntaxException>(&p, std::move(p.ec.GetErrors().front()));
         }
@@ -70,7 +70,7 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
     stack().Push(&c);
     if (!p.Upvalues.empty())
     {
-        auto& env = *registry.Get(cv::RIDX_GLOBALS);
+        auto& env = *registry.Get(cv::LUA_RIDX_GLOBALS);
         c.upvals.front() = std::make_unique<Upvalue>(env);
     }
     return st;
@@ -90,7 +90,7 @@ TStatus lua::State::LoadFileX(std::string_view filename, std::string_view mode)
         return Load(data, "@" + std::string(filename), mode);
     }
     MakeError<FileException>(std::string(filename));
-    return TStatus::ERRFILE;
+    return TStatus::LUA_ERRFILE;
 }
 
 void lua::State::OpenLibs()
@@ -115,7 +115,7 @@ Table* lua::State::GetArgs()
 
 void lua::State::RequireF(const char* modname, Function openf, bool glb)
 {
-    GetSubTable(cv::REGISTRYINDEX, "_LOADED");
+    GetSubTable(cv::LUA_REGISTRYINDEX, "_LOADED");
     GetField(-1, modname);
     if (!ToBoolean(-1))
     {
@@ -209,8 +209,8 @@ std::pair<uint32_t, bool> lua::State::CurrentLine(uint32_t level) const
 
 std::pair<uint32_t, const TopPrototype*> lua::State::Where(size_t level) const
 {
-    //if (!level)
-    //    return {};
+    // if (!level)
+    //     return {};
     auto stk = &stack();
     const Prototype* proto{};
     uint32_t line{};
@@ -306,7 +306,7 @@ void lua::State::Pop(size_t n)
 
 void lua::State::PushGlobalTable()
 {
-    auto g = registry.Get(cv::RIDX_GLOBALS);
+    auto g = registry.Get(cv::LUA_RIDX_GLOBALS);
     stack().Push(**g);
 }
 
@@ -367,7 +367,7 @@ size_t lua::State::GetTop()
 int32_t lua::State::RegisterCount()
 {
     auto c = stack().closure;
-    return c? c->proto->MaxStackSize : 0;
+    return c ? c->proto->MaxStackSize : 0;
 }
 
 uint8_t lua::State::GetTable(int32_t idx)
@@ -385,7 +385,7 @@ uint8_t lua::State::GetField(int32_t idx, std::string k)
 
 bool lua::State::GetSubTable(int32_t idx, std::string fname)
 {
-    if (GetField(idx, fname) == type::TABLE)
+    if (GetField(idx, fname) == cv::type::LUA_TTABLE)
     {
         return true;
     }
@@ -399,7 +399,7 @@ bool lua::State::GetSubTable(int32_t idx, std::string fname)
 
 uint8_t lua::State::GetGlobal(const std::string& name)
 {
-    auto t = registry.Get(cv::RIDX_GLOBALS);
+    auto t = registry.Get(cv::LUA_RIDX_GLOBALS);
     return GetTable(**t, name, false);
 }
 
@@ -407,11 +407,11 @@ uint8_t lua::State::GetMetafield(int32_t idx, const std::string_view& sv)
 {
     if (!GetMetatable(idx))
     {
-        return type::NIL;
+        return cv::type::LUA_TNIL;
     }
     PushString(std::string(sv));
     auto tt = RawGet(-2);
-    tt == type::NIL ? Pop(2) : Remove(-2);
+    tt == cv::type::LUA_TNIL ? Pop(2) : Remove(-2);
     return tt;
 }
 
@@ -466,15 +466,15 @@ void lua::State::SetMetatable(int32_t idx)
     {
         val.SetMetatable(std::get<Table*>(*mtVal), this);
     }
-    else
+    else if (!exception)
     {
-        // TODO error
+        Error2("attempt to set metatable of a %s value", TypeName(val.TypeOf()));
     }
 }
 
 void lua::State::SetGlobal(std::string k)
 {
-    auto& t = *registry.Get(cv::RIDX_GLOBALS);
+    auto& t = *registry.Get(cv::LUA_RIDX_GLOBALS);
     auto v = stack().Pop();
     SetTable(*t, k, std::move(*v), false);
 }
@@ -569,16 +569,18 @@ void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
         }
     }
 
-    if (c)
+    if (!c)
     {
-        if (c->proto)
-        {
-            CallLuaClosure(nArgs, nRes, c, tail);
-        }
-        else
-        {
-            CallFuncClosure(nArgs, nRes, c, tail);
-        }
+        Error2("attempt to call a %s value", TypeName(val.TypeOf()));
+        // TODO result number
+    }
+    else if (c->proto)
+    {
+        CallLuaClosure(nArgs, nRes, c, tail);
+    }
+    else
+    {
+        CallFuncClosure(nArgs, nRes, c, tail);
     }
 
     // TODO error
@@ -591,7 +593,7 @@ TStatus lua::State::PCall(int32_t nArgs, int32_t nRes, int32_t msgh)
     Call(nArgs, nRes);
     std::ostringstream os;
     auto st = Catch(os);
-    if (st != TStatus::OK)
+    if (st != TStatus::LUA_OK)
     {
         // while (&stack() != &caller)
         // {
@@ -606,7 +608,7 @@ TStatus lua::State::PCall(int32_t nArgs, int32_t nRes, int32_t msgh)
             SetTop(1);
             PushString(std::move(msg));
             Call(1, -1);
-            if (exception && exception->Status() != TStatus::ERRERR)
+            if (exception && exception->Status() != TStatus::LUA_ERRERR)
             {
                 MakeError<ErrorException>(exception->ToString());
             }
@@ -623,7 +625,7 @@ TStatus lua::State::PCall(int32_t nArgs, int32_t nRes, int32_t msgh)
 bool lua::State::CallMeta(int obj, std::string_view event)
 {
     obj = AbsIndex(obj);
-    if (GetMetafield(obj, event) == type::NIL)
+    if (GetMetafield(obj, event) == cv::type::LUA_TNIL)
     {
         return false;
     }
@@ -703,7 +705,8 @@ void lua::State::Len(int32_t idx)
         }
         else
         {
-            // TODO error
+            stack().Push(int64_t(-1));
+            Error2("attempt to get length of a %s value", TypeName(val.TypeOf()));
         }
     }
 }
@@ -755,7 +758,15 @@ void lua::State::Concat(int32_t n)
             }
             else
             {
-                // TODO error
+                stack().Push("");
+                if (auto bt = b->TypeOf(); bt != cv::type::LUA_TSTRING)
+                {
+                    Error2("attempt to concatenate a %s value", TypeName(bt));
+                }
+                else if (auto at = a->TypeOf(); at != cv::type::LUA_TSTRING)
+                {
+                    Error2("attempt to concatenate a %s value", TypeName(at));
+                }
             }
         }
     }
@@ -787,9 +798,9 @@ void lua::State::SetTop(int32_t idx)
     auto newTop = stack().AbsIndex(idx);
     if (newTop < 0)
     {
-        // TODO error
+        throw "invalid stack top size";
     }
-                            
+
     auto top = stack().top;
     if (top > newTop)
     {
@@ -817,21 +828,21 @@ const char* lua::State::TypeName(uint8_t tp)
 {
     switch (tp)
     {
-    case type::NIL:
+    case cv::type::LUA_TNIL:
         return "nil";
-    case type::BOOLEAN:
+    case cv::type::LUA_TBOOLEAN:
         return "boolean";
-    case type::NUMBER:
+    case cv::type::LUA_TNUMBER:
         return "number";
-    case type::STRING:
+    case cv::type::LUA_TSTRING:
         return "string";
-    case type::TABLE:
+    case cv::type::LUA_TTABLE:
         return "table";
-    case type::FUNCTION:
+    case cv::type::LUA_TFUNCTION:
         return "function";
-    case type::THREAD:
+    case cv::type::LUA_TUSERDATA:
         return "thread";
-    case type::NONE:
+    case cv::type::LUA_TNONE:
         return "no value";
     default:
         return "userdata";
@@ -850,23 +861,23 @@ uint8_t lua::State::Type(int32_t idx)
         return stack().Get(idx).TypeOf();
     }
 
-    return type::NONE;
+    return cv::type::LUA_TNONE;
 }
 
 bool lua::State::IsNil(int32_t idx)
 {
-    return Type(idx) == type::NIL;
+    return Type(idx) == cv::type::LUA_TNIL;
 }
 
 bool lua::State::IsNone(int32_t idx)
 {
-    return Type(idx) == type::NONE;
+    return Type(idx) == cv::type::LUA_TNONE;
 }
 
 bool lua::State::IsNoneOrNil(int32_t idx)
 {
     auto t = Type(idx);
-    return t == type::NIL || t == type::NONE;
+    return t == cv::type::LUA_TNIL || t == cv::type::LUA_TNONE;
 }
 
 bool lua::State::IsFloat(int32_t idx)
@@ -921,7 +932,7 @@ bool lua::State::StringToNumber(std::string s)
 bool lua::State::IsString(int32_t idx)
 {
     auto t = Type(idx);
-    return type::STRING == t || type::NUMBER == t;
+    return cv::type::LUA_TSTRING == t || cv::type::LUA_TNUMBER == t;
 }
 
 std::string lua::State::ToString(int32_t idx)
@@ -969,22 +980,22 @@ std::string lua::State::ToString2(int32_t idx)
     else
         switch (Type(idx))
         {
-        case type::STRING:
-        case type::NUMBER:
+        case cv::type::LUA_TSTRING:
+        case cv::type::LUA_TNUMBER:
             PushString(std::move(ToStringX(idx).first));
             break;
-        case type::BOOLEAN:
+        case cv::type::LUA_TBOOLEAN:
             PushString(ToBoolean(idx) ? "true" : "false");
             break;
-        case type::NIL:
+        case cv::type::LUA_TNIL:
             PushString("nil");
             break;
         default:
         {
             auto tt = GetMetafield(idx, str::NAME);
-            auto kind = type::STRING == tt ? CheckString(-1) : TypeName2(idx);
+            auto kind = cv::type::LUA_TSTRING == tt ? CheckString(-1) : TypeName2(idx);
             PushString(std::format("{0}: {1:p}", kind, ToPointer(idx)));
-            if (type::STRING != tt)
+            if (cv::type::LUA_TSTRING != tt)
                 Remove(-2);
         }
         break;
@@ -1029,13 +1040,13 @@ std::string lua::State::CheckString(int32_t idx)
 {
     auto [s, ok] = ToStringX(idx);
     if (!ok)
-        TagError(idx, type::STRING);
+        TagError(idx, cv::type::LUA_TSTRING);
     return s;
 }
 
 void lua::State::CheckAny(int32_t idx)
 {
-    if (Type(idx) == type::NONE)
+    if (Type(idx) == cv::type::LUA_TNONE)
     {
         ArgError(idx, "value expected");
     }
@@ -1077,6 +1088,11 @@ bool lua::State::Next(int32_t idx)
         else
             Error2("invalid key to 'next'");
     }
+    else if (!exception)
+    {
+        Error2("attempt to get next key of a %s value", TypeName(val.TypeOf()));
+    }
+
     return false;
 }
 
@@ -1125,7 +1141,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
     auto& oldStack = stack();
     if (tail)
     {
-        CheckStack(cv::MINSTACK + nRegs);
+        CheckStack(cv::LUA_MINSTACK + nRegs);
         if (nArgs > nParams && isVararg)
         {
             oldStack.varargs = oldStack.PopN(nArgs - nParams);
@@ -1138,7 +1154,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
         return;
     }
 
-    auto newStack = std::make_unique<Stack>(cv::MINSTACK + nRegs, this);
+    auto newStack = std::make_unique<Stack>(cv::LUA_MINSTACK + nRegs, this);
     auto funcAndArgs = oldStack.PopN(nArgs + 1);
     if (nArgs > nParams && isVararg)
     {
@@ -1164,7 +1180,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
 void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c, bool tail)
 {
     auto& oldStack = stack();
-    auto newStack = std::make_unique<Stack>(cv::MINSTACK + nArgs, this);
+    auto newStack = std::make_unique<Stack>(cv::LUA_MINSTACK + nArgs, this);
     newStack->closure = c;
     if (nArgs > 0)
     {
@@ -1202,14 +1218,15 @@ TStatus lua::State::RunLuaClosure()
         }
         if (inst.Opcode() == Op::RETURN || inst.Opcode() == Op::TAILCALL)
         {
-            return TStatus::OK;
+            return TStatus::LUA_OK;
         }
     }
 }
 
 uint8_t lua::State::GetTable(const Value& t, const Value& k, bool raw)
 {
-    if (t.IsTable())
+    auto isTable = t.IsTable();
+    if (isTable)
     {
         auto tbl = std::get<Table*>(t);
         auto v = tbl->Get(k);
@@ -1225,8 +1242,7 @@ uint8_t lua::State::GetTable(const Value& t, const Value& k, bool raw)
     {
         if (auto mf = t.GetMetafield(str::INDEX, this))
         {
-            bool right = true;
-            uint8_t res = std::visit(
+            return std::visit(
                 [&](auto&& arg)
                 {
                     using T = std::decay_t<decltype(arg)>;
@@ -1243,25 +1259,25 @@ uint8_t lua::State::GetTable(const Value& t, const Value& k, bool raw)
                     }
                     else
                     {
-                        right = false;
-                        return uint8_t{};
+                        stack().Push(nullptr);
+                        return cv::type::LUA_TNIL;
                     }
                 },
                 *mf);
-            if (right)
-            {
-                return res;
-            }
         }
     }
-
-    // TODO error
+    if (!isTable)
+    {
+        Error2("attempt to index a %s value", TypeName(t.TypeOf()));
+    }
+    PushNil();
     return 0;
 }
 
 void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
 {
-    if (t.IsTable())
+    auto isTable = t.IsTable();
+    if (isTable)
     {
         auto tbl = std::get<Table*>(t);
         auto old = tbl->Get(k);
@@ -1269,11 +1285,11 @@ void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
         {
             Barrier(t, k);
             Barrier(t, v);
-            if (auto err = tbl->Put(Value{ k }, std::move(v)))
+            if (auto err = tbl->Put(Value{k}, std::move(v)))
             {
                 auto msg = 1 == err ? "table index is nil" : "table index is NaN";
                 Error2(msg);
-            }               
+            }
             return;
         }
     }
@@ -1281,14 +1297,11 @@ void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
     {
         if (auto mf = t.GetMetafield(str::NEWINDEX, this))
         {
-            bool right = true;
             std::visit(
                 [&](auto&& arg)
                 {
                     using T = std::decay_t<decltype(arg)>;
-                    if constexpr (std::is_same_v<T, Table*>)
-                        SetTable(*mf, k, std::move(v), false);
-                    else if constexpr (std::is_same_v<T, Closure*>)
+                    if constexpr (std::is_same_v<T, Closure*>)
                     {
                         stack().Push(*mf);
                         stack().Push(t);
@@ -1297,19 +1310,17 @@ void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
                         Call(3, 0);
                     }
                     else
-                    {
-                        right = false;
-                    }
+                        SetTable(*mf, k, std::move(v), false);
                 },
                 *mf);
-            if (right)
-            {
-                return;
-            }
+            return;
         }
     }
 
-    // TODO error
+    if (!isTable)
+    {
+        Error2("attempt to index a %s value", TypeName(t.TypeOf()));
+    }
 }
 
 void lua::State::IntError(int32_t idx)
@@ -1317,7 +1328,7 @@ void lua::State::IntError(int32_t idx)
     if (IsFloat(idx))
         ArgError(idx, "number has no integer representation");
     else
-        TagError(idx, type::NUMBER);
+        TagError(idx, cv::type::LUA_TNUMBER);
 }
 
 void lua::State::TagError(int32_t idx, uint8_t tag)
@@ -1328,11 +1339,11 @@ void lua::State::TagError(int32_t idx, uint8_t tag)
 int32_t lua::State::TypeError(int32_t idx, const std::string_view& tname)
 {
     std::string typeArg;
-    if (GetMetafield(idx, str::NAME) == type::STRING)
+    if (GetMetafield(idx, str::NAME) == cv::type::LUA_TSTRING)
     {
         typeArg = ToString(-1);
     }
-    else if (Type(idx) == type::LIGHTUSERDATA)
+    else if (Type(idx) == cv::type::LUA_TLIGHTUSERDATA)
     {
         typeArg = "light userdata";
     }

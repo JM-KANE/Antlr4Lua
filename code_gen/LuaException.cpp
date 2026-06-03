@@ -14,7 +14,7 @@ std::string lua::Exception::ToString() const
 
 TStatus lua::FileException::Status() const
 {
-    return TStatus::ERRFILE;
+    return TStatus::LUA_ERRFILE;
 }
 
 std::string lua::FileException::ToString() const
@@ -46,15 +46,15 @@ lua::SyntaxException::SyntaxException(const TopPrototype* p, SyntaxError&& info)
 
 TStatus lua::SyntaxException::Status() const
 {
-    return TStatus::ERRSYNTAX;
+    return TStatus::LUA_ERRSYNTAX;
 }
 
 TStatus lua::RunException::Status() const
 {
-    return TStatus::ERRRUN;
+    return TStatus::LUA_ERRRUN;
 }
 
 TStatus lua::ErrorException::Status() const
 {
-    return TStatus::ERRERR;
+    return TStatus::LUA_ERRERR;
 }

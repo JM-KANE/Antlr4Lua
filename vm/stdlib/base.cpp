@@ -41,7 +41,7 @@ int32_t iPairsAux(State* ls)
 {
     auto i = ls->CheckInteger(2) + 1;
     ls->PushInteger(i);
-    return ls->GetI(1, i) == type::NIL ? 1 : 2;
+    return ls->GetI(1, i) == cv::type::LUA_TNIL ? 1 : 2;
 }
 
 int32_t outStream(State* ls, std::ostream& os, const char* seg)
@@ -69,7 +69,7 @@ int32_t outStream(State* ls, std::ostream& os, const char* seg)
 
 int32_t loadAux(State* ls, TStatus status, int32_t envIdx)
 {
-    if (TStatus::OK == status)
+    if (TStatus::LUA_OK == status)
     {
         if (envIdx)
         {
@@ -135,7 +135,7 @@ int32_t lua::stdlib::base::Error(State* ls)
 int32_t lua::stdlib::base::Select(State* ls)
 {
     auto n = int64_t(ls->GetTop());
-    if (ls->Type(1) == type::STRING && ls->CheckString(1) == "#")
+    if (ls->Type(1) == cv::type::LUA_TSTRING && ls->CheckString(1) == "#")
     {
         ls->PushInteger(n - 1);
         return 1;
@@ -168,7 +168,7 @@ int32_t lua::stdlib::base::IPairs(State* ls)
 int32_t lua::stdlib::base::Pairs(State* ls)
 {
     ls->CheckAny(1);
-    if (ls->GetMetafield(1, str::PAIRS) == type::NIL)
+    if (ls->GetMetafield(1, str::PAIRS) == cv::type::LUA_TNIL)
     {
         ls->PushFunction(base::Next);
         ls->PushValue(1);
@@ -184,7 +184,7 @@ int32_t lua::stdlib::base::Pairs(State* ls)
 
 int32_t lua::stdlib::base::Next(State* ls)
 {
-    ls->CheckType(1, type::TABLE);
+    ls->CheckType(1, cv::type::LUA_TTABLE);
     ls->SetTop(2);
     if (ls->Next(1))
     {
@@ -199,7 +199,7 @@ int32_t lua::stdlib::base::Next(State* ls)
 
 int32_t lua::stdlib::base::Load(State* ls)
 {
-    TStatus status{TStatus::ERRFILE};
+    TStatus status{TStatus::LUA_ERRFILE};
     auto [chunk, isStr] = ls->ToStringX(1);
     auto mode = ls->OptString(3, "bt");
     auto env = 0;
@@ -237,11 +237,11 @@ int32_t lua::stdlib::base::DoFile(State* ls)
 {
     auto fname = ls->OptString(1, "bt");
     ls->SetTop(1);
-    if (ls->LoadFile(fname) != TStatus::OK)
+    if (ls->LoadFile(fname) != TStatus::LUA_OK)
     {
         return 0;
     }
-    ls->Call(0, cv::RIDX_GLOBALS);
+    ls->Call(0, cv::LUA_RIDX_GLOBALS);
     return (int32_t)ls->GetTop() - 1;
 }
 
@@ -249,7 +249,7 @@ int32_t lua::stdlib::base::PCall(State* ls)
 {
     auto nArgs = ls->GetTop() - 1;
     auto status = ls->PCall((int32_t)nArgs, -1, 0);
-    ls->PushBoolean(status == TStatus::OK);
+    ls->PushBoolean(status == TStatus::LUA_OK);
     ls->Insert(1);
     return (int32_t)ls->GetTop();
 }
@@ -259,7 +259,7 @@ int32_t lua::stdlib::base::XPCall(State* ls)
     auto nArgs = ls->GetTop() - 2;
     ls->Rotate(2, -1);
     auto status = ls->PCall((int32_t)nArgs, -1, 1);
-    ls->PushBoolean(status == TStatus::OK);
+    ls->PushBoolean(status == TStatus::LUA_OK);
     ls->Insert(1);
     return (int32_t)ls->GetTop();
 }
@@ -279,9 +279,9 @@ int32_t lua::stdlib::base::GetMetatable(State* ls)
 int32_t lua::stdlib::base::SetMetatable(State* ls)
 {
     auto t = ls->Type(2);
-    ls->CheckType(1, type::TABLE);
-    ls->ArgCheck(t == type::NIL || t == type::TABLE, 2, "nil or table expected");
-    if (ls->GetMetafield(1, str::METATABLE) != type::NIL)
+    ls->CheckType(1, cv::type::LUA_TTABLE);
+    ls->ArgCheck(t == cv::type::LUA_TNIL || t == cv::type::LUA_TTABLE, 2, "nil or table expected");
+    if (ls->GetMetafield(1, str::METATABLE) != cv::type::LUA_TNIL)
     {
         return ls->Error2("cannot change a protected metatable");
     }
@@ -301,14 +301,14 @@ int32_t lua::stdlib::base::RawEqual(State* ls)
 int32_t lua::stdlib::base::RawLen(State* ls)
 {
     auto t = ls->Type(1);
-    ls->ArgCheck(t == type::TABLE || t == type::STRING, 1, "table or string expected");
+    ls->ArgCheck(t == cv::type::LUA_TTABLE || t == cv::type::LUA_TSTRING, 1, "table or string expected");
     ls->PushInteger(int64_t(ls->RawLen(1)));
     return 1;
 }
 
 int32_t lua::stdlib::base::RawGet(State* ls)
 {
-    ls->CheckType(1, type::TABLE);
+    ls->CheckType(1, cv::type::LUA_TTABLE);
     ls->CheckAny(2);
     ls->SetTop(2);
     ls->RawGet(1);
@@ -317,7 +317,7 @@ int32_t lua::stdlib::base::RawGet(State* ls)
 
 int32_t lua::stdlib::base::RawSet(State* ls)
 {
-    ls->CheckType(1, type::TABLE);
+    ls->CheckType(1, cv::type::LUA_TTABLE);
     ls->CheckAny(2);
     ls->CheckAny(3);
     ls->SetTop(3);
@@ -328,7 +328,7 @@ int32_t lua::stdlib::base::RawSet(State* ls)
 int32_t lua::stdlib::base::Type(State* ls)
 {
     auto t = ls->Type(1);
-    ls->ArgCheck(t != type::NONE, 1, "value expected");
+    ls->ArgCheck(t != cv::type::LUA_TNONE, 1, "value expected");
     ls->PushString(ls->TypeName(t));
     return 1;
 }
@@ -345,7 +345,7 @@ int32_t lua::stdlib::base::ToNumber(State* ls)
     if (ls->IsNoneOrNil(2))
     {
         ls->CheckAny(1);
-        if (ls->Type(1) == type::NUMBER)
+        if (ls->Type(1) == cv::type::LUA_TNUMBER)
         {
             ls->SetTop(1);
             return 1;
@@ -357,7 +357,7 @@ int32_t lua::stdlib::base::ToNumber(State* ls)
     }
     else
     {
-        ls->CheckType(1, type::STRING);
+        ls->CheckType(1, cv::type::LUA_TSTRING);
         auto s = ls->ToString(1);
         auto base = int(ls->CheckInteger(2));
         ls->ArgCheck(2 <= base && base <= 36, 2, "base out of range");

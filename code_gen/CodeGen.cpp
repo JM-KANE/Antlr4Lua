@@ -400,16 +400,16 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     auto chunk = parser.chunk();
     if (proto.ec.HasErrors())
     {
-        return TStatus::ERRSYNTAX;
+        return TStatus::LUA_ERRSYNTAX;
     }
 
     GenerateProto(chunk, proto);
     if (proto.ec.HasErrors())
     {
-        return TStatus::ERRSYNTAX;
+        return TStatus::LUA_ERRSYNTAX;
     }
 
-    return TStatus::OK;
+    return TStatus::LUA_OK;
 }
 
 void lua::CodeGen::GenerateProto(LuaParser::ChunkContext* ck, TopPrototype& proto)
@@ -683,7 +683,7 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
         else
         {
             auto indexTable = static_cast<LuaParser::IndextableContext*>(vars[i]);
-            auto [t,  kind] = PrefixToOpArg(indexTable->prefixexp(), Arg::REG);
+            auto [t, kind] = PrefixToOpArg(indexTable->prefixexp(), Arg::REG);
             auto member = indexTable->member();
             auto k = VisitMember(member);
             auto line = member->Line();
@@ -691,7 +691,7 @@ std::any lua::CodeGen::visitAssign(LuaParser::AssignContext* ctx)
             kind == Arg::UPVAL ? fi->EmitSetTabUp(line, t, k, v) : fi->EmitSetTable(line, t, k, v);
         }
     }
-    fi->usedRegs = oldRegs; 
+    fi->usedRegs = oldRegs;
     for (size_t i = nVars; i < nExps; i++)
     {
         auto r = fi->AllocReg();
