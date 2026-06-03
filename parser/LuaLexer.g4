@@ -9,7 +9,7 @@ options {
 }
 
 @header {
-#include "../base/LuaLexerBase.h"
+#include "LuaLexerBase.h"
 }
 
 SEMI : ';';

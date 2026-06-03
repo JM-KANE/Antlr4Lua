@@ -38,11 +38,6 @@ private:
     static uint32_t Line(antlr4::tree::TerminalNode* ctx);
 
 public:
-    // static auto& Instance()
-    // {
-    //     static CodeGen cg;
-    //     return cg;
-    // }
 
     static bool IsVarargOrFuncCall(LuaRuleContext* exp);
     static void RemoveTailNils(std::vector<LuaParser::ExpContext*>& exps);

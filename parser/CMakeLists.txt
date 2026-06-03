@@ -19,18 +19,18 @@ set(GEN_AUX
     ${GEN_DIR}/LuaParser.tokens
 )
 set(G4_FILE
-    ${PROJECT_SOURCE_DIR}/LuaLexer.g4 
-    ${PROJECT_SOURCE_DIR}/LuaParser.g4
+    ${PARSER_DIR}/LuaLexer.g4 
+    ${PARSER_DIR}/LuaParser.g4
 )
 set(LUA_BASE
-    ${PROJECT_SOURCE_DIR}/base/LuaLexerBase.h
-    ${PROJECT_SOURCE_DIR}/base/LuaLexerBase.cpp
-    ${PROJECT_SOURCE_DIR}/base/LuaParserBase.h
-    ${PROJECT_SOURCE_DIR}/base/LuaParserBase.cpp
-    ${PROJECT_SOURCE_DIR}/base/LuaRuleContext.cpp
-    ${PROJECT_SOURCE_DIR}/base/LuaRuleContext.h
-    ${PROJECT_SOURCE_DIR}/base/ErrorCollector.cpp
-    ${PROJECT_SOURCE_DIR}/base/ErrorCollector.h
+    ${PARSER_DIR}/LuaLexerBase.h
+    ${PARSER_DIR}/LuaLexerBase.cpp
+    ${PARSER_DIR}/LuaParserBase.h
+    ${PARSER_DIR}/LuaParserBase.cpp
+    ${PARSER_DIR}/LuaRuleContext.cpp
+    ${PARSER_DIR}/LuaRuleContext.h
+    ${PARSER_DIR}/ErrorCollector.cpp
+    ${PARSER_DIR}/ErrorCollector.h
 )
 
 # set(ANTLR java -Xmx500M -cp "/usr/local/lib/antlr-4.13.2-complete.jar" org.antlr.v4.Tool)

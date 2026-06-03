@@ -12,12 +12,13 @@ project(Antlr4Lua LANGUAGES CXX)
 # endif()
 
 set(GEN_DIR ${PROJECT_SOURCE_DIR}/generated)
+set(PARSER_DIR ${PROJECT_SOURCE_DIR}/parser)
 
 include_directories(${GEN_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/base)
+include_directories(${PROJECT_SOURCE_DIR}/parser)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/antlr4/runtime/Cpp)
-add_subdirectory(${PROJECT_SOURCE_DIR}/base)
+add_subdirectory(${PARSER_DIR})
 add_subdirectory(${PROJECT_SOURCE_DIR}/code_gen)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vm)
 

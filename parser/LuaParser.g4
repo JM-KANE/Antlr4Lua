@@ -10,7 +10,7 @@ options {
 }
 
 @header {
-#include "../base/LuaParserBase.h"
+#include "LuaParserBase.h"
 #include "LuaRuleContext.h"
 }
 
