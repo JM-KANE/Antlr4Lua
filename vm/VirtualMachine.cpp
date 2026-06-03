@@ -241,13 +241,15 @@ void lua::VirtualMachine::Run()
         main.Throw();
         return;
     }
+    main.SetEnv(0);
 
+    // call main
     auto nArgs = argc - 2;
     for (int64_t i = 0; i < nArgs; i++)
     {
         main.PushString(argv[i + 2]);
     }
-    main.Call((int32_t)argc - 2, -1);
+    main.Call((int32_t)argc - 2, cv::LUA_MULTRET);
 
     // throw runtime error
     main.Throw();

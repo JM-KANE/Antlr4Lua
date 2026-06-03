@@ -28,6 +28,8 @@ struct State
     TStatus LoadFile(std::string_view filename);
     TStatus LoadFileX(std::string_view filename, std::string_view mode);
 
+    void SetEnv(int32_t idx);
+
     template <size_t N>
     void SetFuncs(const FuncReg<N>& l, size_t nup)
     {
@@ -308,6 +310,7 @@ struct State
     int64_t OptInteger(int32_t idx, int64_t def);
     std::string OptString(int32_t idx, std::string_view def);
     void* ToPointer(int32_t idx);
+    Closure* ToFunction(int32_t idx) const;
 
     int64_t CheckInteger(int32_t idx);
     std::string CheckString(int32_t idx);

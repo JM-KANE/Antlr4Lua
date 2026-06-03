@@ -28,6 +28,7 @@ double ToFloat(const std::string& str, std::from_chars_result* res = {});
 double ToHexFloat(const std::string& str, std::from_chars_result* res = {});
 
 std::pair<int64_t, bool> FloatToInteger(double f);
+std::string CodepointToUtf8(char32_t cp);
 
 }  // namespace number
 

@@ -6,7 +6,7 @@
 using namespace lua;
 using namespace lua::number;
 
-std::string lua::CodeGen::Unescape(std::string_view src)
+std::pair<std::string, uint8_t> lua::CodeGen::Unescape(std::string_view src)
 {
     std::string dst;
     auto escapeD = [&](size_t& i)
@@ -14,14 +14,9 @@ std::string lua::CodeGen::Unescape(std::string_view src)
         auto si = i;
         for (size_t j = 0; j < 3; j++)
         {
-            if (src[i] <= '9' && src[i] >= '0')
-            {
-                ++i;
-            }
-            else
-            {
+            if (i >= src.size() || src[i] > '9' || src[i] < '0')
                 break;
-            }
+            ++i;
         }
         auto cs = src.data();
         int16_t n;
@@ -30,20 +25,31 @@ std::string lua::CodeGen::Unescape(std::string_view src)
         if (n < 256)
         {
             dst.push_back(char(n));
+            return true;
         }
+        return false;
     };
     auto escapeX = [&](size_t& i)
     {
         auto cs = src.data();
-        int16_t n;
+        char n;
         std::from_chars(cs + i, cs + i + 2, n, 16);
         ++i;
-        if (n < 256)
-        {
-            dst.push_back(char(n));
-        }
+        dst.push_back(n);
     };
-
+    auto escapeU = [&](size_t& i)
+    {
+        auto last = src.find_first_of('}', i);
+        if (last > i + 8)
+            return false;
+        uint32_t n;
+        auto cs = src.data();
+        std::from_chars(cs + i, cs + last, n, 16);
+        auto str = number::CodepointToUtf8(n);
+        dst += str;
+        i = last;
+        return true;
+    };
     for (size_t i = 0; i < src.size(); ++i)
     {
         if (src[i] == '\\' && i + 1 < src.size())
@@ -51,7 +57,8 @@ std::string lua::CodeGen::Unescape(std::string_view src)
             ++i;
             if (src[i] <= '9' && src[i] >= '0')
             {
-                escapeD(i);
+                if (!escapeD(i))
+                    return {{}, 2};
             }
             else
             {
@@ -83,10 +90,14 @@ std::string lua::CodeGen::Unescape(std::string_view src)
                         ++i;
                     break;
                 case 'x':
-                    escapeD(++i);
+                    escapeX(++i);
                     break;
                 case 'u':
-                    // TODO utf8
+                    i += 2;
+                    if (!escapeU(i))
+                    {
+                        return {{}, 1};
+                    }
                     break;
                 case '\'':
                 case '\"':
@@ -110,7 +121,21 @@ std::string lua::CodeGen::Unescape(std::string_view src)
             dst.push_back(src[i]);
         }
     }
-    return dst;
+    return {dst, 0};
+}
+
+std::string lua::CodeGen::CheckUnescape(std::string_view src, LuaParser::StringContext* ctx)
+{
+    auto [unStr, ok] = Unescape(src);
+    if (1 == ok)
+    {
+        fi->Error(ctx->getStart(), ctx->Line(), "UTF-8 value too large");
+    }
+    else if (2 == ok)
+    {
+        fi->Error(ctx->getStart(), ctx->Line(), "decimal escape too large");
+    }
+    return unStr;
 }
 
 std::string lua::CodeGen::TrimLong(const std::string& str)
@@ -235,16 +260,18 @@ std::pair<slot_type, uint8_t> lua::CodeGen::ExpToOpArg(LuaParser::ExpContext* no
                 {
                 case (size_t)LuaRuleContext::String::Normalstring:
                 {
-                    auto str = static_cast<LuaParser::NormalstringContext*>(sn)->NORMALSTRING()->getText();
+                    auto strNode = static_cast<LuaParser::NormalstringContext*>(sn);
+                    auto str = strNode->NORMALSTRING()->getText();
                     std::string_view sv(str.begin() + 1, str.end() - 1);
-                    idx = (slot_type)fi->IndexOfConstant(Unescape(sv));
+                    idx = (slot_type)fi->IndexOfConstant(CheckUnescape(sv, strNode));
                 }
                 break;
                 case (size_t)LuaRuleContext::String::Charstring:
                 {
-                    auto str = static_cast<LuaParser::CharstringContext*>(sn)->CHARSTRING()->getText();
+                    auto strNode = static_cast<LuaParser::CharstringContext*>(sn);
+                    auto str = strNode->CHARSTRING()->getText();
                     std::string_view sv(str.begin() + 1, str.end() - 1);
-                    idx = (slot_type)fi->IndexOfConstant(Unescape(sv));
+                    idx = (slot_type)fi->IndexOfConstant(CheckUnescape(sv, strNode));
                 }
                 break;
                 default:
@@ -1330,7 +1357,7 @@ std::any lua::CodeGen::visitNormalstring(LuaParser::NormalstringContext* ctx)
 {
     auto str = ctx->NORMALSTRING()->getText();
     std::string_view sv(str.begin() + 1, str.end() - 1);
-    fi->EmitLoadK(ctx->Line(), _a, Unescape(sv));
+    fi->EmitLoadK(ctx->Line(), _a, CheckUnescape(sv, ctx));
     return std::any();
 }
 
@@ -1338,7 +1365,7 @@ std::any lua::CodeGen::visitCharstring(LuaParser::CharstringContext* ctx)
 {
     auto str = ctx->CHARSTRING()->getText();
     std::string_view sv(str.begin() + 1, str.end() - 1);
-    fi->EmitLoadK(ctx->Line(), _a, Unescape(sv));
+    fi->EmitLoadK(ctx->Line(), _a, CheckUnescape(sv, ctx));
     return std::any();
 }
 

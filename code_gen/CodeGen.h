@@ -30,7 +30,8 @@ private:
     std::unique_ptr<FuncInfo> root;
     FuncInfo* fi{};
 
-    static std::string Unescape(std::string_view src);
+    static std::pair<std::string, uint8_t> Unescape(std::string_view src);
+    std::string CheckUnescape(std::string_view src, LuaParser::StringContext* ctx);
     static std::string TrimLong(const std::string& str);
 
     void VisitWithPara(slot_type a, slot_type n, LuaRuleContext* ctx);

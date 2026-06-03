@@ -103,7 +103,7 @@ fragment EscapeSequence:
     | UtfEscape
 ;
 
-fragment DecimalEscape: '\\' Digit | '\\' Digit Digit | '\\' [0-2] Digit Digit;
+fragment DecimalEscape: '\\' Digit | '\\' Digit Digit | '\\' Digit Digit Digit;
 
 fragment HexEscape: '\\' 'x' HexDigit HexDigit;
 

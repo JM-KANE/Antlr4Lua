@@ -12,7 +12,7 @@ void lua::TopPrototype::PrintError(std::ostream& os)
 
 std::string lua::TopPrototype::ShortSource() const
 {
-    if (!Source.empty() && Source.front() == '@')
+    if (!Source.empty() && (Source.front() == '@' || Source.front() == '='))
     {
         return Source.substr(1);
     }

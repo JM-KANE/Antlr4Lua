@@ -71,10 +71,7 @@ int32_t loadAux(State* ls, TStatus status, int32_t envIdx)
 {
     if (TStatus::LUA_OK == status)
     {
-        if (envIdx)
-        {
-            // TODO env
-        }
+        ls->SetEnv(envIdx);
         return 1;
     }
     else
@@ -83,7 +80,6 @@ int32_t loadAux(State* ls, TStatus status, int32_t envIdx)
         std::ostringstream os;
         ls->Catch(os);
         ls->PushString(os.str());
-        // ls->Insert(-2);
         return 2;
     }
 }
@@ -202,21 +198,38 @@ int32_t lua::stdlib::base::Load(State* ls)
     TStatus status{TStatus::LUA_ERRFILE};
     auto [chunk, isStr] = ls->ToStringX(1);
     auto mode = ls->OptString(3, "bt");
-    auto env = 0;
+    int32_t env = 0;
     if (!ls->IsNone(4))
     {
         env = 4;
     }
-    if (isStr)
+    auto chunkname = ls->OptString(2, chunk);
+    if (!isStr)
     {
-        auto chunkname = ls->OptString(2, chunk);
-        status = ls->Load(chunk, std::move(chunkname), mode);
+        chunk.clear();
+        while (1)
+        {
+            ls->PushValue(1);
+            ls->Call(0, 1);
+            auto vt = ls->Type(-1);
+            auto [chunkSeg, isStr] = ls->ToStringX(-1);
+            ls->Pop(1);
+            if (isStr)
+            {
+                chunk += chunkSeg;
+                continue;
+            }     
+            if (vt != cv::type::LUA_TNIL)
+            {
+                ls->Error2("reader function must return a string");
+                ls->PushNil();
+                ls->PushString("");
+                return 2;
+            }
+            break;
+        }            
     }
-    else
-    {
-        // TODO loading from a reader function
-    }
-
+    status = ls->Load(chunk, std::move(chunkname), mode);  
     return loadAux(ls, status, env);
 }
 
@@ -241,7 +254,8 @@ int32_t lua::stdlib::base::DoFile(State* ls)
     {
         return 0;
     }
-    ls->Call(0, cv::LUA_RIDX_GLOBALS);
+    ls->SetEnv(0);
+    ls->Call(0,  cv::LUA_MULTRET);
     return (int32_t)ls->GetTop() - 1;
 }
 
@@ -376,6 +390,6 @@ int32_t lua::stdlib::base::ToNumber(State* ls)
 
 int32_t lua::stdlib::base::CollectGarbage(State* ls)
 {
-    // TODO
+    // TODO gc
     return 0;
 }

@@ -100,5 +100,38 @@ std::pair<int64_t, bool> FloatToInteger(double f)
     return std::pair<int64_t, bool>(i, i == f);
 }
 
+std::string CodepointToUtf8(char32_t cp)
+{
+    std::string result;
+    if (cp <= 0x7F)
+    {
+        result.push_back(static_cast<char>(cp));
+    }
+    else if (cp <= 0x7FF)
+    {
+        result.push_back(static_cast<char>(0xC0 | ((cp >> 6) & 0x1F)));
+        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    else if (cp <= 0xFFFF)
+    {
+        result.push_back(static_cast<char>(0xE0 | ((cp >> 12) & 0x0F)));
+        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    else if (cp <= 0x10FFFF)
+    {
+        result.push_back(static_cast<char>(0xF0 | ((cp >> 18) & 0x07)));
+        result.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    else
+    {
+        result = "\xEF\xBF\xBD";
+    }
+    return result;
+}
+
+
 }  // namespace number
 }  // namespace lua

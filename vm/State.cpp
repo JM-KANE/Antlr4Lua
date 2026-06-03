@@ -68,11 +68,6 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
 
     auto& c = vm->NewLuaClosure(p);
     stack().Push(&c);
-    if (!p.Upvalues.empty())
-    {
-        auto& env = *registry.Get(cv::LUA_RIDX_GLOBALS);
-        c.upvals.front() = std::make_unique<Upvalue>(env);
-    }
     return st;
 }
 
@@ -91,6 +86,26 @@ TStatus lua::State::LoadFileX(std::string_view filename, std::string_view mode)
     }
     MakeError<FileException>(std::string(filename));
     return TStatus::LUA_ERRFILE;
+}
+
+void lua::State::SetEnv(int32_t idx)
+{
+    auto c = ToFunction(-1);
+    if (!c->proto->Upvalues.empty())
+    {
+        ValuePtr valPtr;
+        if (0 == idx)
+        {
+            valPtr = *registry.Get(cv::LUA_RIDX_GLOBALS);
+        }
+        else
+        {
+            auto val = stack().Get(idx);
+            valPtr = std::make_shared<Value>(std::move(val));
+            vm->AddClosed(valPtr);
+        }
+        c->upvals.front() = std::make_unique<Upvalue>(std::move(valPtr));
+    }
 }
 
 void lua::State::OpenLibs()
@@ -1020,6 +1035,21 @@ void* lua::State::ToPointer(int32_t idx)
         {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, Table*> || std::is_same_v<T, Closure*> || std::is_same_v<T, State*>)
+                return arg;
+            else
+                return nullptr;
+        },
+        val);
+}
+
+Closure* lua::State::ToFunction(int32_t idx) const
+{
+    auto val = stack().Get(idx);
+    return std::visit(
+        [](auto&& arg) -> Closure*
+        {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr ( std::is_same_v<T, Closure*>)
                 return arg;
             else
                 return nullptr;

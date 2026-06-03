@@ -135,7 +135,7 @@ public:
 private:
     /* global */
     Table registry;
-    Table global;
+    Table global;   ///< env of main
     std::unique_ptr<Table> args;
 
     // TODO randomseed
