@@ -18,6 +18,7 @@ protected:
 public:
     bool IsFunctionCall();
     void SetREPL();
+    bool IsREPL() const;
 };
 }  // namespace lua
 #endif

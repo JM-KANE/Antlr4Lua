@@ -124,8 +124,8 @@ int32_t lua::stdlib::base::Error(State* ls)
 }
 
 // int32_t lua::stdlib::base::Warn(State* ls)
-//{
-//     return outStream(ls, ls->Err(), " ");
+// {
+//     return outStream(ls, ls->Err(), "");
 // }
 
 int32_t lua::stdlib::base::Select(State* ls)
@@ -218,7 +218,7 @@ int32_t lua::stdlib::base::Load(State* ls)
             {
                 chunk += chunkSeg;
                 continue;
-            }     
+            }
             if (vt != cv::type::LUA_TNIL)
             {
                 ls->Error2("reader function must return a string");
@@ -227,9 +227,9 @@ int32_t lua::stdlib::base::Load(State* ls)
                 return 2;
             }
             break;
-        }            
+        }
     }
-    status = ls->Load(chunk, std::move(chunkname), mode);  
+    status = ls->Load(chunk, std::move(chunkname), mode);
     return loadAux(ls, status, env);
 }
 
@@ -255,7 +255,7 @@ int32_t lua::stdlib::base::DoFile(State* ls)
         return 0;
     }
     ls->SetEnv(0);
-    ls->Call(0,  cv::LUA_MULTRET);
+    ls->Call(0, cv::LUA_MULTRET);
     return (int32_t)ls->GetTop() - 1;
 }
 

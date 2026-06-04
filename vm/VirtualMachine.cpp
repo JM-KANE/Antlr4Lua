@@ -261,7 +261,7 @@ void lua::VirtualMachine::RunREPL()
     Value* printer{};
     std::string line;
     std::string chunk;
-    (*out) << "> ";
+    (*out) << "Lua 5.3 based on antlr4\n> ";
     while (std::getline(*in, line))
     {
         chunk += line + '\n';
@@ -278,8 +278,8 @@ void lua::VirtualMachine::RunREPL()
                 chunk.clear();
                 main.Throw();
             }
-            (*out) << "> "; 
-            continue;   
+            (*out) << "> ";
+            continue;
         }
         chunk.clear();
         main.SetEnv(0);
@@ -287,10 +287,10 @@ void lua::VirtualMachine::RunREPL()
         if (!printer)
         {
             printer = global.Get("print")->get();
-            //if (!printer)
+            // if (!printer)
             //{
-            //    // new print
-            //}
+            //     // new print
+            // }
         }
         auto nArgs = (int32_t)main.GetTop();
         main.PushAny(*printer);

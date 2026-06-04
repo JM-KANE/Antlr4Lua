@@ -451,13 +451,15 @@ TStatus lua::CodeGen::GenerateProto(LuaParser& parser, TopPrototype& proto)
     {
         return TStatus::LUA_ERRSYNTAX;
     }
-
     auto ck = start->chunk();
     root = std::make_unique<FuncInfo>(ck);
     root->ec = &proto.ec;
     root->AddLocVar(str::ENV, 0);
     fi = root.get();
-    ck->accept(this);
+    if (parser.IsREPL())
+        visitChunkREPL(ck);
+    else
+        ck->accept(this);
     root->subFuncs.front()->ToProto(proto);
     if (proto.ec.HasErrors())
     {
@@ -610,6 +612,43 @@ std::any lua::CodeGen::visitEvalexpblock(LuaParser::EvalexpblockContext* ctx)
     subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
     subFi.EmitReturn(ctx->LastLine(), 0, 0);
     return std::any();
+}
+
+bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
+{
+    auto an = ctx->getAltNumber();
+    if (1 == an)
+    {
+        auto block = static_cast<LuaParser::NormalblockContext*>(ctx)->block();
+        auto stats = block->stat();
+        auto ret = block->retstat();
+        if (stats.size() == 1 && !ret && stats.front()->getAltNumber() == (size_t)LuaRuleContext::Stat::Functioncall_)
+        {
+            auto fc_ = static_cast<LuaParser::Functioncall_Context*>(stats.front());
+            auto r = fi->AllocReg();
+            auto line = fc_->LastLine();
+            auto fc = fc_->functioncall();
+            auto nArgs = PrepFuncCall(fc, r);
+            fi->EmitTailCall(line, r, nArgs);
+            fi->FreeReg();
+            fi->EmitReturn(line, r, -1);
+            return true;
+        }
+        for (auto&& stat : stats)
+        {
+            stat->accept(this);
+        }
+        if (ret)
+        {
+            visitRetstat(ret);
+        }
+    }
+    else if (2 == an)
+    {
+        auto eval = static_cast<LuaParser::EvalexpblockContext*>(ctx);
+        visitEvalexpblock(eval);
+    }
+    return false;
 }
 
 void lua::CodeGen::DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names,

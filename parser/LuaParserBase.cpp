@@ -27,3 +27,8 @@ void LuaParserBase::SetREPL()
 {
     interactive = true;
 }
+
+bool lua::LuaParserBase::IsREPL() const
+{
+    return interactive;
+}

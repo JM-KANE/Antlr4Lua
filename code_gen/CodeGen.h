@@ -38,7 +38,6 @@ private:
     static uint32_t Line(antlr4::tree::TerminalNode* ctx);
 
 public:
-
     static bool IsVarargOrFuncCall(LuaRuleContext* exp);
     static void RemoveTailNils(std::vector<LuaParser::ExpContext*>& exps);
 
@@ -65,6 +64,7 @@ public:
     std::any visitBlock(LuaParser::BlockContext* ctx) override;
     std::any visitRetstat(LuaParser::RetstatContext* ctx) override;
     std::any visitEvalexpblock(LuaParser::EvalexpblockContext* ctx) override;
+    bool visitChunkREPL(LuaParser::ChunkContext* ctx);
 
     void DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names, uint32_t line);
     std::any visitAssign(LuaParser::AssignContext* ctx) override;
