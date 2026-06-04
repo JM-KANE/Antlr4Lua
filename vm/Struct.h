@@ -9,6 +9,7 @@ namespace lua
 struct Upvalue
 {
     ValuePtr val;
+    bool closed{};
 };
 
 using UpvaluePtr = std::shared_ptr<Upvalue>;
@@ -16,6 +17,7 @@ using UpvaluePtr = std::shared_ptr<Upvalue>;
 struct Closure
 {
     uint8_t color{};
+    std::unique_ptr<TopPrototype> topInfo;
     const Prototype* proto{};
     Function func{};
     std::vector<UpvaluePtr> upvals;

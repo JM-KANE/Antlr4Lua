@@ -7,6 +7,11 @@ lua::Stack::Stack(size_t size, State* st) : slots(size), state{st}
 {
 }
 
+lua::Stack::~Stack()
+{
+    CloseUpvalues();
+}
+
 uint32_t lua::Stack::CurrentLine() const
 {
     return closure->proto->LineInfo[pc - 1];
@@ -178,6 +183,18 @@ bool lua::Stack::IsValid(int32_t idx) const
     }
     auto absIdx = AbsIndex(idx);
     return absIdx > 0 && absIdx <= top;
+}
+
+void lua::Stack::CloseUpvalues()
+{
+    if (!openuvs.empty())
+    {
+        for (auto& [i, uv] : openuvs)
+        {
+            uv->closed = true;
+        }
+        openuvs.clear();
+    }
 }
 
 void lua::Stack::Mark(std::vector<Value>& grey)

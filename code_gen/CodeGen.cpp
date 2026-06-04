@@ -560,9 +560,11 @@ std::any lua::CodeGen::DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool sel
     fi = &subFi;
     visitBlock(ctx->block());
     fi = subFi.parent;
+    auto line = ctx->LastLine();
     subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
-    subFi.EmitReturn(ctx->LastLine(), 0, 0);
-    fi->EmitClosure(ctx->LastLine(), a, int32_t(fi->subFuncs.size() - 1));
+    subFi.EmitReturn(line, 0, 0);
+
+    fi->EmitClosure(line, a, int32_t(fi->subFuncs.size() - 1));
     return std::any();
 }
 
@@ -572,8 +574,9 @@ std::any lua::CodeGen::visitNormalblock(LuaParser::NormalblockContext* ctx)
     fi = &subFi;
     visitBlock(ctx->block());
     fi = subFi.parent;
+    auto line = ctx->LastLine();
     subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
-    subFi.EmitReturn(ctx->LastLine(), 0, 0);
+    subFi.EmitReturn(line, 0, 0);
     return std::any();
 }
 
@@ -609,7 +612,6 @@ std::any lua::CodeGen::visitEvalexpblock(LuaParser::EvalexpblockContext* ctx)
     fi = &subFi;
     DoReturn({ctx->exp()}, ctx->LastLine());
     fi = subFi.parent;
-    subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
     subFi.EmitReturn(ctx->LastLine(), 0, 0);
     return std::any();
 }
@@ -634,6 +636,7 @@ bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
             fi->EmitTailCall(line, r, nArgs);
             fi->FreeReg();
             fi->EmitReturn(line, r, -1);
+            return true;
         }
         else
         {
@@ -647,9 +650,9 @@ bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
             }
         }
         fi = subFi.parent;
+        auto line = ctx->LastLine();
         subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
-        subFi.EmitReturn(ctx->LastLine(), 0, 0);
-        return true;
+        subFi.EmitReturn(line, 0, 0);
     }
     else if (2 == an)
     {

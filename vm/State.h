@@ -173,6 +173,7 @@ struct State
         constexpr auto mm = OP::field_name;
         auto at = a.TypeOf();
         auto bt = b.TypeOf();
+        auto hasFloat = a.index() == 3 || b.index() == 3;
         auto [resM, ok] = CallMetamethod(std::move(a), std::move(b), mm);  // unary op
         if (ok)
         {
@@ -185,7 +186,7 @@ struct State
             const char* opName{};
             if constexpr (bit)
             {
-                if (a.index() == 3 || b.index() == 3)
+                if (hasFloat)
                 {
                     Error2("number has no integer representation");
                     return;

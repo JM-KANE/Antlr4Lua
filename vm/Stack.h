@@ -17,6 +17,7 @@ struct Stack
     Stack* prev{};
 
     Stack(size_t size, State* st);
+    ~Stack();
 
     uint32_t CurrentLine() const;
 
@@ -40,6 +41,7 @@ struct Stack
     void Reverse(size_t from, size_t to);
 
     bool IsValid(int32_t idx) const;
+    void CloseUpvalues();
 
     void Mark(std::vector<Value>& grey);
 };

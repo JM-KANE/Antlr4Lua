@@ -22,6 +22,11 @@ void lua::Closure::Mark(std::vector<Value>& grey)
 
 void lua::Closure::MarkChildren(std::vector<Value>& grey)
 {
+    for (auto& uv : upvals)
+    {
+        if (uv->closed)
+            uv->val->Mark(grey);
+    }
 }
 
 int64_t lua::Table::KeyToInt(const Value& key)

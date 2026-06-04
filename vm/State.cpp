@@ -50,7 +50,8 @@ std::istream& lua::State::In() const
 
 TStatus lua::State::Load(const std::string& data, std::string chunkName, std::string_view mode)
 {
-    auto& p = vm->NewProto();
+    auto topInfo = std::make_unique<TopPrototype>();
+    auto& p = *topInfo;
     p.Source = std::move(chunkName);
     TStatus st{};
     if (false)
@@ -72,13 +73,15 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
     }
 
     auto& c = vm->NewLuaClosure(p);
+    c.topInfo = std::move(topInfo);
     stack().Push(&c);
     return st;
 }
 
 std::pair<TStatus, bool> lua::State::LoadStream(const std::string& data)
 {
-    auto& p = vm->NewProto();
+    auto topInfo = std::make_unique<TopPrototype>();
+    auto& p = *topInfo;
     p.Source = "=stdin";
     CodeGen cg;
     auto st = cg.GenerateREPL(data, p);
@@ -91,6 +94,7 @@ std::pair<TStatus, bool> lua::State::LoadStream(const std::string& data)
         return st;
     }
     auto& c = vm->NewLuaClosure(p);
+    c.topInfo = std::move(topInfo);
     stack().Push(&c);
     return st;
 }
@@ -126,9 +130,9 @@ void lua::State::SetEnv(int32_t idx)
         {
             auto val = stack().Get(idx);
             valPtr = std::make_shared<Value>(std::move(val));
-            vm->AddClosed(valPtr);
         }
         c->upvals.front() = std::make_unique<Upvalue>(std::move(valPtr));
+        c->upvals.front()->closed = idx;
     }
 }
 
@@ -568,9 +572,7 @@ void lua::State::CloseUpvalues(int32_t n)
         auto&& [i, openuv] = *it;
         if (i + 1 >= n)
         {
-            // auto val = std::make_shared<Value>(std::move(*openuv->val));
-            // openuv->val = std::move(val);
-            vm->AddClosed(openuv->val);
+            openuv->closed = true;
             it = ovs.erase(it);
         }
         else
@@ -1196,6 +1198,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
     auto& oldStack = stack();
     if (tail)
     {
+        oldStack.CloseUpvalues();
         if (nArgs > nParams && isVararg)
         {
             oldStack.varargs = oldStack.PopN(nArgs - nParams);
@@ -1250,6 +1253,7 @@ void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c, bool t
     auto& oldStack = stack();
     if (tail)
     {
+        oldStack.CloseUpvalues();
         Rotate(1, nArgs);
         oldStack.top = 0;
         CheckStack(cv::LUA_MINSTACK + nArgs);

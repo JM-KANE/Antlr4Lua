@@ -123,24 +123,12 @@ void lua::Collector::Refresh()
             for (auto&& v : s.first)
                 v.color = 0;
         });
-    for (auto&& v : _closedValue)
-        std::visit(Refresher(), *v.lock());
     grey.clear();
 }
 
 void lua::Collector::MarkGrey()
 {
     vm->main.Mark(grey);
-    std::erase_if(_closedValue,
-                  [&](auto& val)
-                  {
-                      bool res = val.expired();
-                      if (!res)
-                      {
-                          val.lock()->Mark(grey);
-                      }
-                      return res;
-                  });
 }
 
 void lua::Collector::MarkChildren()
@@ -323,11 +311,6 @@ bool lua::VirtualMachine::REPL() const
     return true;
 }
 
-TopPrototype& lua::VirtualMachine::NewProto()
-{
-    return *topProtos.emplace_back(std::make_unique<TopPrototype>());
-}
-
 Closure& lua::VirtualMachine::NewLuaClosure(const Prototype& p)
 {
     return gc.Allocate<Closure>(&p);
@@ -354,11 +337,6 @@ Table* lua::VirtualMachine::GetArgs()
         }
     }
     return args.get();
-}
-
-void lua::VirtualMachine::AddClosed(const ValuePtr& v)
-{
-    gc._closedValue.emplace_front(v);
 }
 
 void lua::VirtualMachine::CollectGarbage()
