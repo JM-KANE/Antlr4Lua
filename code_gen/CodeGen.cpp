@@ -837,7 +837,9 @@ std::any lua::CodeGen::visitBreak(LuaParser::BreakContext* ctx)
 
 std::any lua::CodeGen::visitGoto(LuaParser::GotoContext* ctx)
 {
-    // TODO
+    auto pc = fi->EmitJmp(ctx->Line(), fi->GetJmpArgA(), 0);
+    auto label = ctx->NAME()->getText();
+    fi->AddGotoJmp(std::move(label), pc);
     return LuaParserBaseVisitor::visitGoto(ctx);
 }
 

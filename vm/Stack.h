@@ -7,8 +7,8 @@ namespace lua
 {
 struct Stack
 {
-    std::vector<ValuePtr> slots;
     size_t top{};
+    std::vector<ValuePtr> slots;
     State* state{};
     Closure* closure{};
     std::vector<ValuePtr> varargs;

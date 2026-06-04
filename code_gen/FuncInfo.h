@@ -73,6 +73,12 @@ struct LocVarInfo
     LocVarInfo(std::string n, uint32_t slv, slot_type st, size_t s, size_t e);
 };
 
+struct GotoInfo
+{
+    size_t pc{};
+    std::vector<slot_type> locals;
+};
+
 struct FuncInfo
 {
     FuncInfo* parent{};
@@ -85,6 +91,11 @@ struct FuncInfo
     std::unordered_map<std::string, UpvalInfo> upvalues;
     std::unordered_map<any_type, size_t> constants;
     std::vector<std::unique_ptr<std::vector<size_t>>> breaks;
+
+    using labels_type = std::vector<size_t>;
+    using gotos_type = std::vector<std::vector<GotoInfo>>;
+    std::unordered_map<std::string, std::pair<labels_type, gotos_type>> gotos;
+
     std::vector<uint32_t> insts;
     std::vector<uint32_t> lineNums;
     const uint32_t line{};
@@ -122,6 +133,7 @@ struct FuncInfo
 
     slot_type GetJmpArgA() const;
     void AddBreakJmp(size_t pc);
+    void AddGotoJmp(std::string label, size_t pc);
     void CloseOpenUpvals(uint32_t line);
     void FixSbx(size_t pc, int32_t sBx);
     void FixEndPC(const std::string& name, int32_t delta);
@@ -165,6 +177,9 @@ struct FuncInfo
     void GetUpvalueNames(std::vector<std::string>& v);
     void GetLocVars(std::vector<Prototype::LocVar>& v);
     void ToSubProtos(Prototype& p);
+
+private:
+    std::vector<slot_type> CurrentLocals() const;
 };
 
 }  // namespace lua

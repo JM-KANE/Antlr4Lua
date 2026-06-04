@@ -376,12 +376,13 @@ void lua::State::LoadVararg(int32_t n)
     stack().PushN(vars, n);
 }
 
-void lua::State::LoadProto(int32_t idx)
+void lua::State::LoadProto(int32_t idx, int32_t r)
 {
     auto& stk = stack();
     auto& subProto = stk.closure->proto->Protos[(size_t)idx];
     auto& closure = vm->NewLuaClosure(subProto);
     stk.Push(&closure);
+    Replace(r);
     for (size_t i = 0; i < subProto.Upvalues.size(); i++)
     {
         auto& uvInfo = subProto.Upvalues[i];
@@ -1260,8 +1261,8 @@ void lua::State::CallFuncClosure(int32_t nArgs, int32_t nRes, Closure* c, bool t
         oldStack.closure = c;
         oldStack.top = nArgs;
         oldStack.pc = 0;
-        c->func(this);
-        oldStack.Push((int64_t)oldStack.top - nArgs);
+        auto r = c->func(this);
+        oldStack.Push(r);
         return;
     }
     auto newStack = std::make_unique<Stack>(cv::LUA_MINSTACK + nArgs, this);

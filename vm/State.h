@@ -101,7 +101,7 @@ struct State
     void GetConst(int32_t idx);
     void GetRK(int32_t idx);
     void LoadVararg(int32_t n);
-    void LoadProto(int32_t idx);
+    void LoadProto(int32_t idx, int32_t r);
     size_t GetTop();
     int32_t RegisterCount();
     uint8_t GetTable(int32_t idx);

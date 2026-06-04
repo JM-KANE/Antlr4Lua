@@ -454,8 +454,7 @@ void closure(Instruction i, State* ls)
 {
     auto [a, bx] = i.ABx();
     ++a;
-    ls->LoadProto(bx);
-    ls->Replace(a);
+    ls->LoadProto(bx, a);
 }
 // R(A), R(A+1), ..., R(A+B-2) = vararg
 void vararg(Instruction i, State* ls)
