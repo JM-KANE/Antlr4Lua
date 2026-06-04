@@ -63,7 +63,7 @@ Download the ANTLR4 Java tool from [antlr.org](https://www.antlr.org/download/an
 cd /usr/local/lib
 curl -O https://www.antlr.org/download/antlr-4.13.2-complete.jar
 ```
-Then set cmake cache varible `ANTLR_PATH` to to the directory where the jar file is located. You can do this by adding a `CMakeUserPresets.json` file or by using the CMake command line when configuring/building.
+Then set CMake cache varible `ANTLR_PATH` to to the directory where the jar file is located. You can do this by adding a `CMakeUserPresets.json` file or by using the CMake command line when configuring/building.
 
 ### 4. Build
 This project leverages `CMakePresets.json` to simplify configuration and build. You can list available configure and build presets:
@@ -99,7 +99,7 @@ Or execute a Lua script:
 
 ## Roadmap
 * Full language support – implement complete Lua 5.5 syntax and semantics.
-* Performance optimizations – custome parser, register‑based instruction set and a JIT * prototype.
+* Performance optimizations – custom parser, register‑based instruction set and a JIT * prototype.
 * Error diagnostics – precise syntax error messages and runtime stack traces.
 * Standard library – complete table operations, string module, etc.
 

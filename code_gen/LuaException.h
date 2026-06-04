@@ -13,6 +13,7 @@ struct Exception /*: public std::exception*/
     Exception(std::string m);
     virtual TStatus Status() const = 0;
     virtual std::string ToString() const;
+    virtual ~Exception() = default;
 };
 
 struct FileException : public Exception

@@ -10,6 +10,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
         "ANTLR_PATH": "/usr/local/lib/antlr-4.13.2-complete.jar"
       },
       "condition": {
@@ -64,7 +66,12 @@
       "name": "base-build",
       "jobs": 4,
       "verbose": false,
-      "hidden": true
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }  
     },
     {
       "name": "linux-debug",
@@ -79,11 +86,16 @@
     {
       "name": "x64-debug",
       "inherits": "base-build",
-      "configurePreset": "x64-debug"
+      "configurePreset": "x64-debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }  
     },
     {
       "name": "x64-release",
-      "inherits": "base-build",
+      "inherits": "x64-debug",
       "configurePreset": "x64-release"
     }
   ]
