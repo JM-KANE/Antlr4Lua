@@ -16,6 +16,7 @@ struct State
     std::vector<std::unique_ptr<Stack>> stacks;
     std::unique_ptr<Exception> exception;
     TStatus status{};
+    bool _warn{};
 
     State(VirtualMachine* _vm, Table& reg);
     void Mark(std::vector<Value>& grey);
@@ -29,6 +30,7 @@ struct State
     std::pair<TStatus, bool> LoadStream(const std::string& data);
     TStatus LoadFile(std::string_view filename);
     TStatus LoadFileX(std::string_view filename, std::string_view mode);
+
 
     void SetEnv(int32_t idx);
 
@@ -334,6 +336,10 @@ struct State
     TStatus RunLuaClosure();
     uint8_t GetTable(const Value& t, const Value& k, bool raw);
     void SetTable(const Value& t, const Value& k, Value v, bool raw);
+
+    
+    bool Warn() const;
+    void SetWarn(bool b);
 
     void IntError(int32_t idx);
     void TagError(int32_t idx, uint8_t tag);

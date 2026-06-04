@@ -6,11 +6,11 @@ using namespace lua;
 using namespace stdlib;
 namespace
 {
-constexpr FuncReg<25> baseFuncs{
+constexpr FuncReg<26> baseFuncs{
     pair_type{"print", base::Print},
     {"assert", base::Assert},
     {"error", base::Error},
-    // {"warn", base::Warn},
+    {"warn", base::Warn},
     {"select", base::Select},
     {"ipairs", base::IPairs},
     {"pairs", base::Pairs},
@@ -123,10 +123,35 @@ int32_t lua::stdlib::base::Error(State* ls)
     return ls->Error();
 }
 
-// int32_t lua::stdlib::base::Warn(State* ls)
-// {
-//     return outStream(ls, ls->Err(), "");
-// }
+ int32_t lua::stdlib::base::Warn(State* ls)
+ {
+     auto nArgs = ls->GetTop();
+     if (1 == nArgs)
+     {
+         auto [str, ok] = ls->ToStringX(1);
+         if (ok)
+         {
+             if ("@on" == str)
+             {
+                 ls->SetWarn(true);
+                 return 0;
+             }
+             else if ("@off" == str)
+             {
+                 ls->SetWarn(false);
+                 return 0;
+             }
+         }
+     }
+
+     if (ls->Warn())
+     {  
+         auto& err = ls->Err();
+         err << "Lua warning: ";
+         return outStream(ls, err, "");
+     }
+     return 0;
+ }
 
 int32_t lua::stdlib::base::Select(State* ls)
 {

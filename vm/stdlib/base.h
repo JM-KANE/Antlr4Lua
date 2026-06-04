@@ -14,7 +14,7 @@ namespace base
 int32_t Print(State* ls);
 int32_t Assert(State* ls);
 int32_t Error(State* ls);
-// int32_t Warn(State* ls);
+int32_t Warn(State* ls);
 int32_t Select(State* ls);
 int32_t IPairs(State* ls);
 int32_t Pairs(State* ls);

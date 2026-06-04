@@ -619,6 +619,8 @@ bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
     auto an = ctx->getAltNumber();
     if (1 == an)
     {
+        auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(ctx, fi));
+        fi = &subFi;    
         auto block = static_cast<LuaParser::NormalblockContext*>(ctx)->block();
         auto stats = block->stat();
         auto ret = block->retstat();
@@ -632,16 +634,22 @@ bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
             fi->EmitTailCall(line, r, nArgs);
             fi->FreeReg();
             fi->EmitReturn(line, r, -1);
-            return true;
         }
-        for (auto&& stat : stats)
+        else
         {
-            stat->accept(this);
+            for (auto&& stat : stats)
+            {
+                stat->accept(this);
+            }
+            if (ret)
+            {
+                visitRetstat(ret);
+            }
         }
-        if (ret)
-        {
-            visitRetstat(ret);
-        }
+        fi = subFi.parent;
+        subFi.RemoveScopeLocVars(true, subFi.PC() + 1);
+        subFi.EmitReturn(ctx->LastLine(), 0, 0);
+        return true;
     }
     else if (2 == an)
     {

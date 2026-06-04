@@ -1403,6 +1403,16 @@ void lua::State::SetTable(const Value& t, const Value& k, Value v, bool raw)
     }
 }
 
+bool lua::State::Warn() const
+{
+    return _warn;
+}
+
+void lua::State::SetWarn(bool b)
+{
+    _warn = b;
+}
+
 void lua::State::IntError(int32_t idx)
 {
     if (IsFloat(idx))
