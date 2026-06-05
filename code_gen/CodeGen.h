@@ -65,6 +65,8 @@ public:
     std::any visitBlock(LuaParser::BlockContext* ctx) override;
     std::any visitRetstat(LuaParser::RetstatContext* ctx) override;
     std::any visitEvalexpblock(LuaParser::EvalexpblockContext* ctx) override;
+    void VisitStatements(const std::vector<LuaParser::StatContext*>& stats, LuaParser::RetstatContext* ret,
+                         LuaParser::BlockContext* b);
     bool visitChunkREPL(LuaParser::ChunkContext* ctx);
 
     void DoVarDecl(const std::vector<LuaParser::ExpContext*>& exps, std::vector<std::string>&& names, uint32_t line);

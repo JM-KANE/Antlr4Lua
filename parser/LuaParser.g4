@@ -108,7 +108,7 @@ exp
     | 'true'                            # true
     | number                            # number_
     | string                            # string_
-    | '...' { if (!isVara.back()) notifyErrorListeners("cannot use '...' outside a vararg function"); }                            
+    | '...' {if (!isVara.back()) notifyErrorListeners("cannot use '...' outside a vararg function"); }                            
         # varargexp
     | functiondef                       # functiondef_
     | prefixexp                         # prefixexp_

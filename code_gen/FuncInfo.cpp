@@ -342,7 +342,7 @@ void lua::FuncInfo::FixGotoSbx(const std::string& name, uint32_t line)
             {
                 auto localVar = info.gotos.front().local;
                 if (localVar)
-                    jmpInlocal = locVars.back()->slot > localVar->slot;
+                    jmpInlocal = CurrentLocal(scopeLv)->slot > localVar->slot;
             }
             if (jmpInlocal)
             {
@@ -351,7 +351,6 @@ void lua::FuncInfo::FixGotoSbx(const std::string& name, uint32_t line)
             info.pc = PC();
             for (auto& [pc, slot] : info.gotos)
             {
-                // insts[pc] &= (1 << 14) - 1;
                 insts[pc] |= (info.pc - pc + cv::MAXARG_sBx - 1) << 14;
             }
             info.gotos.clear();

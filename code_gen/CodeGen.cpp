@@ -589,35 +589,14 @@ std::any lua::CodeGen::visitFuncbody(LuaParser::FuncbodyContext* ctx)
 
 std::any lua::CodeGen::visitBlock(LuaParser::BlockContext* ctx)
 {
-    fi->labels.push_back(parser->GetLabels(ctx));
-    auto stats = ctx->stat();
-
-    for (auto& stat : stats)
-    {
-        if (stat->getAltNumber() != (size_t)LuaRuleContext::Stat::Label_ && fi->ReleaseScopeError())
-        {
-            fi->labels.pop_back();
-            return std::any();
-        }
-        stat->accept(this);
-    }
-    if (auto retstat = ctx->retstat())
-    {
-        if (fi->ReleaseScopeError())
-        {
-            fi->labels.pop_back();
-            return std::any();
-        }
-        visitRetstat(retstat);
-    }
-    fi->labels.pop_back();
-    fi->localScope.reset();
+    VisitStatements(ctx->stat(), ctx->retstat(), ctx);
     return std::any();
 }
 
 std::any lua::CodeGen::visitRetstat(LuaParser::RetstatContext* ctx)
 {
-    auto exps = ctx->explist()->exp();
+    auto list = ctx->explist();
+    auto exps = list ? ctx->explist()->exp() : std::vector<LuaParser::ExpContext*>();
     DoReturn(exps, ctx->LastLine());
     return std::any();
 }
@@ -630,6 +609,32 @@ std::any lua::CodeGen::visitEvalexpblock(LuaParser::EvalexpblockContext* ctx)
     fi = subFi.parent;
     subFi.EmitReturn(ctx->LastLine(), 0, 0);
     return std::any();
+}
+
+void lua::CodeGen::VisitStatements(const std::vector<LuaParser::StatContext*>& stats,
+                                   LuaParser::RetstatContext* ret, LuaParser::BlockContext* b)
+{
+    fi->labels.push_back(parser->GetLabels(b));
+    for (auto& stat : stats)
+    {
+        if (stat->getAltNumber() != (size_t)LuaRuleContext::Stat::Label_ && fi->ReleaseScopeError())
+        {
+            fi->labels.pop_back();
+            return ;
+        }
+        stat->accept(this);
+    }
+    if (ret)
+    {
+        if (fi->ReleaseScopeError())
+        {
+            fi->labels.pop_back();
+            return;
+        }
+        visitRetstat(ret);
+    }
+    fi->labels.pop_back();
+    fi->localScope.reset();
 }
 
 bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
@@ -656,14 +661,7 @@ bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
         }
         else
         {
-            for (auto&& stat : stats)
-            {
-                stat->accept(this);
-            }
-            if (ret)
-            {
-                visitRetstat(ret);
-            }
+            VisitStatements(stats, ret, block);
         }
         fi = subFi.parent;
         auto line = ctx->LastLine();

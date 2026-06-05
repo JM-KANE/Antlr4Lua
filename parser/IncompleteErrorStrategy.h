@@ -9,16 +9,19 @@ namespace lua
 class IncompleteErrorStrategy : public antlr4::DefaultErrorStrategy
 {
 public:
-    bool incomplete = true;
+    bool incomplete = false;
 
     antlr4::Token* recoverInline(antlr4::Parser* recognizer) override;
 
+    void sync(antlr4::Parser* recognizer) override;
+
     void reset()
     {
-        incomplete = true;
+        incomplete = false;
     }
 
     bool InComplete() const;
+    bool CheckComplete(antlr4::Parser* recognizer);
 };
 }
 
