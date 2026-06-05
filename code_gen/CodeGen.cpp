@@ -424,6 +424,7 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     lexer.addErrorListener(&proto.ec);
     antlr4::CommonTokenStream tokens(&lexer);
     LuaParser parser(&tokens);
+    this->parser = &parser;
     parser.addErrorListener(&proto.ec);
     return GenerateProto(parser, proto);
 }
@@ -435,6 +436,7 @@ std::pair<TStatus, bool> lua::CodeGen::GenerateREPL(const std::string& data, Top
     lexer.addErrorListener(&proto.ec);
     antlr4::CommonTokenStream tokens(&lexer);
     LuaParser parser(&tokens);
+    this->parser = &parser;
     parser.addErrorListener(&proto.ec);
     parser.SetREPL();
     auto errStrategy = std::make_shared<IncompleteErrorStrategy>();
@@ -587,15 +589,29 @@ std::any lua::CodeGen::visitFuncbody(LuaParser::FuncbodyContext* ctx)
 
 std::any lua::CodeGen::visitBlock(LuaParser::BlockContext* ctx)
 {
+    fi->labels.push_back(parser->GetLabels(ctx));
     auto stats = ctx->stat();
-    for (auto&& stat : stats)
+
+    for (auto& stat : stats)
     {
+        if (stat->getAltNumber() != (size_t)LuaRuleContext::Stat::Label_ && fi->ReleaseScopeError())
+        {
+            fi->labels.pop_back();
+            return std::any();
+        }
         stat->accept(this);
     }
     if (auto retstat = ctx->retstat())
     {
+        if (fi->ReleaseScopeError())
+        {
+            fi->labels.pop_back();
+            return std::any();
+        }
         visitRetstat(retstat);
     }
+    fi->labels.pop_back();
+    fi->localScope.reset();
     return std::any();
 }
 
@@ -823,9 +839,9 @@ std::any lua::CodeGen::visitFunctioncall_(LuaParser::Functioncall_Context* ctx)
 }
 
 std::any lua::CodeGen::visitLabel(LuaParser::LabelContext* ctx)
-{
-    // TODO
-    return LuaParserBaseVisitor::visitLabel(ctx);
+{       
+    fi->FixGotoSbx(ctx->NAME()->getText(), ctx->Line());                                      
+    return {};
 }
 
 std::any lua::CodeGen::visitBreak(LuaParser::BreakContext* ctx)
@@ -837,10 +853,11 @@ std::any lua::CodeGen::visitBreak(LuaParser::BreakContext* ctx)
 
 std::any lua::CodeGen::visitGoto(LuaParser::GotoContext* ctx)
 {
-    auto pc = fi->EmitJmp(ctx->Line(), fi->GetJmpArgA(), 0);
+    auto line = ctx->Line();
+    auto pc = fi->EmitJmp(line, 0, 0);
     auto label = ctx->NAME()->getText();
-    fi->AddGotoJmp(std::move(label), pc);
-    return LuaParserBaseVisitor::visitGoto(ctx);
+    fi->AddGotoJmp(std::move(label), pc, line);
+    return {};
 }
 
 std::any lua::CodeGen::visitDo(LuaParser::DoContext* ctx)

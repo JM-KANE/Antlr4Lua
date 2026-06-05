@@ -29,6 +29,7 @@ private:
 
     std::unique_ptr<FuncInfo> root;
     FuncInfo* fi{};
+    LuaParser* parser{};
 
     static std::pair<std::string, uint8_t> Unescape(std::string_view src);
     std::string CheckUnescape(std::string_view src, LuaParser::StringContext* ctx);

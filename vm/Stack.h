@@ -42,6 +42,7 @@ struct Stack
 
     bool IsValid(int32_t idx) const;
     void CloseUpvalues();
+    int32_t RegisterCount() const;
 
     void Mark(std::vector<Value>& grey);
 };

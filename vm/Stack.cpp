@@ -157,7 +157,11 @@ void lua::Stack::Set(int64_t idx, Value val)
     if (absIdx > 0 && absIdx <= top)
     {
         state->Barrier(state, val);
-        slots[absIdx - 1] = std::make_unique<Value>(std::move(val));
+        auto& slot = slots[absIdx - 1];
+        if (slot)
+            *slot = std::move(val);
+        else
+            slot = std::make_unique<Value>(std::move(val));
     }
     return;
 }
@@ -195,6 +199,15 @@ void lua::Stack::CloseUpvalues()
         }
         openuvs.clear();
     }
+    for (size_t i = 0; i < RegisterCount(); i++)
+    {
+        slots[i] = nullptr;
+    }
+}
+
+int32_t lua::Stack::RegisterCount() const
+{
+    return closure && closure->proto ? closure->proto->MaxStackSize : 0;
 }
 
 void lua::Stack::Mark(std::vector<Value>& grey)

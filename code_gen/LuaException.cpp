@@ -22,21 +22,14 @@ std::string lua::FileException::ToString() const
     return "cannot open " + msg + ": No such file or directory";
 }
 
-lua::CodeException::CodeException(const TopPrototype* p, size_t l, std::string m)
-    : proto(p),
-      line(l),
-      Exception(std::move(m))
+lua::CodeException::CodeException(size_t l, std::string m) : line(l), Exception(std::move(m))
 {
 }
 
-std::string lua::CodeException::ToString() const
+SyntaxException::SyntaxException(const TopPrototype* p, size_t l, std::string m)
+    : CodeException(l, std::move(m)),
+      shortSource{p->ShortSource()}
 {
-    auto src = proto->ShortSource();
-    if (line)
-    {
-        src += ':' + std::to_string(line);
-    }
-    return src + ": " + msg;
 }
 
 lua::SyntaxException::SyntaxException(const TopPrototype* p, SyntaxError&& info)
@@ -44,9 +37,35 @@ lua::SyntaxException::SyntaxException(const TopPrototype* p, SyntaxError&& info)
 {
 }
 
+std::string lua::SyntaxException::ToString() const
+{
+    auto src = shortSource;
+    if (line)
+    {
+        src += ':' + std::to_string(line);
+    }
+    return src + ": " + msg;
+}
+
 TStatus lua::SyntaxException::Status() const
 {
     return TStatus::LUA_ERRSYNTAX;
+}
+
+lua::RunException::RunException(const TopPrototype* p, size_t l, std::string m)
+    : CodeException(l, std::move(m)),
+      proto{p}
+{
+}
+
+std::string lua::RunException::ToString() const
+{
+    auto src = proto->ShortSource();
+    if (line)
+    {
+        src += ':' + std::to_string(line);
+    }
+    return src + ": " + msg;
 }
 
 TStatus lua::RunException::Status() const

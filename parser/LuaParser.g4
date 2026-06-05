@@ -34,7 +34,7 @@ chunkend
     ;
 
 block
-    : stat* retstat?
+    : {PushBlock($ctx);} stat* retstat? {PopBlock();}
     ;
 
 stat
@@ -46,21 +46,21 @@ stat
         # functioncall_
     | label                                                                     
         # label_
-    | 'break' { if (0 == loopDepth) notifyErrorListeners("break outside loop"); }
+    | 'break' {if (0 == loopDepth) notifyErrorListeners("break outside loop");}
         # break
     | 'goto' NAME                                                               
         # goto
     | 'do' block 'end'                                                          
         # do
-    | 'while' exp 'do' { ++loopDepth; } block { --loopDepth; } 'end'                                              
+    | 'while' exp 'do' {++loopDepth;} block {--loopDepth;} 'end'                                              
         # while
-    | 'repeat' { ++loopDepth; } block { --loopDepth; } 'until' exp                                                
+    | 'repeat' {++loopDepth;} block {--loopDepth;} 'until' exp                                                
         # repeat
     | 'if' exp 'then' block ('elseif' exp 'then' block)* ('else' block)? 'end'  
         # if
-    | 'for' NAME '=' exp ',' exp (',' exp)? 'do' { ++loopDepth; } block { --loopDepth; } 'end'                    
+    | 'for' NAME '=' exp ',' exp (',' exp)? 'do' {++loopDepth;} block {--loopDepth;} 'end'                    
         # fornumerical
-    | 'for' namelist 'in' explist 'do' { ++loopDepth; } block { --loopDepth; } 'end'                              
+    | 'for' namelist 'in' explist 'do' {++loopDepth;} block {--loopDepth;} 'end'                              
         # forgeneric
     | 'function' funcname funcbody                                              
         # funcnamedef
@@ -83,7 +83,7 @@ retstat
     ;
 
 label
-    : '::' NAME '::'
+    : '::' NAME {CheckLabel($NAME->getText());} '::'
     ;
 
 funcname

@@ -25,22 +25,25 @@ struct FileException : public Exception
 
 struct CodeException : Exception
 {
-    const TopPrototype* proto;
     size_t line{};
 
-    CodeException(const TopPrototype* p, size_t l, std::string m);
-    std::string ToString() const override;
+    CodeException(size_t l, std::string m);
 };
 
 struct SyntaxException : public CodeException
 {
-    using CodeException::CodeException;
+    std::string shortSource;
+
+    SyntaxException(const TopPrototype* p, size_t l, std::string m);
     SyntaxException(const TopPrototype* p, SyntaxError&& info);
+    std::string ToString() const override;
     TStatus Status() const override;
 };
 struct RunException : public CodeException
 {
-    using CodeException::CodeException;
+    const TopPrototype* proto{};
+    RunException(const TopPrototype* p, size_t l, std::string m);
+    std::string ToString() const override;
     TStatus Status() const override;
 };
 struct ErrorException : public Exception

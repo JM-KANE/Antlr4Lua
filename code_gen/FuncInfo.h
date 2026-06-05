@@ -76,11 +76,21 @@ struct LocVarInfo
 struct GotoInfo
 {
     size_t pc{};
-    std::vector<slot_type> locals;
+    LocVarInfo* local{};
 };
+
+struct LabelInfo
+{
+    size_t pc = -1;
+    std::vector<GotoInfo> gotos;
+};
+
+using LocalScopeInfo = std::tuple<const std::string*, const std::string*, uint32_t>;
 
 struct FuncInfo
 {
+    using block_labels = const LuaParserBase::block_labels*;
+
     FuncInfo* parent{};
     std::vector<std::unique_ptr<FuncInfo>> subFuncs;
     slot_type usedRegs{};
@@ -92,9 +102,9 @@ struct FuncInfo
     std::unordered_map<any_type, size_t> constants;
     std::vector<std::unique_ptr<std::vector<size_t>>> breaks;
 
-    using labels_type = std::vector<size_t>;
-    using gotos_type = std::vector<std::vector<GotoInfo>>;
-    std::unordered_map<std::string, std::pair<labels_type, gotos_type>> gotos;
+    std::vector<block_labels> labels;
+    std::unordered_map<const std::string*, std::unique_ptr<LabelInfo>> labelsInfo;
+    std::unique_ptr<LocalScopeInfo> localScope;
 
     std::vector<uint32_t> insts;
     std::vector<uint32_t> lineNums;
@@ -120,6 +130,7 @@ struct FuncInfo
     {
         ec->CompileError(std::forward<Ts>(args)...);
     }
+    bool ReleaseScopeError();
 
     void EnterScope(bool b);
     void ExitScope(size_t endPC);
@@ -132,9 +143,11 @@ struct FuncInfo
     int64_t IndexOfUpval(const std::string& name);
 
     slot_type GetJmpArgA() const;
+    slot_type GetJmpArgA(uint32_t lv) const;
     void AddBreakJmp(size_t pc);
-    void AddGotoJmp(std::string label, size_t pc);
+    void AddGotoJmp(const std::string& label, size_t pc, uint32_t line);
     void CloseOpenUpvals(uint32_t line);
+    void FixGotoSbx(const std::string& name, uint32_t line);
     void FixSbx(size_t pc, int32_t sBx);
     void FixEndPC(const std::string& name, int32_t delta);
 
@@ -179,7 +192,7 @@ struct FuncInfo
     void ToSubProtos(Prototype& p);
 
 private:
-    std::vector<slot_type> CurrentLocals() const;
+    LocVarInfo* CurrentLocal(uint32_t lv) const;
 };
 
 }  // namespace lua

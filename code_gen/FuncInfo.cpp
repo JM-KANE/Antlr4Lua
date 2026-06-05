@@ -38,6 +38,7 @@ lua::LocVarInfo::LocVarInfo(std::string n, uint32_t slv, slot_type st, size_t s,
 lua::FuncInfo::FuncInfo(LuaRuleContext* node, FuncInfo* p) : parent(p), line(node->Line()), lastLine(node->LastLine())
 {
     breaks.emplace_back();
+    // labels.emplace_back();
     if (parent)
         ec = parent->ec;
 }
@@ -110,6 +111,18 @@ void lua::FuncInfo::FreeRegs(slot_type n)
             FreeReg();
         }
     }
+}
+
+bool lua::FuncInfo::ReleaseScopeError()
+{
+    if (localScope)
+    {
+        auto [l, v, line] = *localScope;
+        Error(nullptr, line, "<goto " + *l + "> jumps into the scope of '" + *v + "'");
+        localScope.reset();
+        return true;
+    }
+    return false;
 }
 
 void lua::FuncInfo::EnterScope(bool b)
@@ -224,13 +237,18 @@ int64_t lua::FuncInfo::IndexOfUpval(const std::string& name)
 
 slot_type lua::FuncInfo::GetJmpArgA() const
 {
+    return GetJmpArgA(scopeLv);
+}
+
+slot_type FuncInfo::GetJmpArgA(uint32_t lv) const
+{
     bool hasCapturedLocVars{};
     auto minSlotOfLocVars = maxRegs;
     for (auto&& [name, locVar] : locNames)
     {
-        if (locVar && locVar->scopeLv == scopeLv)
+        if (locVar && locVar->scopeLv == lv)
         {
-            for (auto v = locVar; v && v->scopeLv == scopeLv; v = v->prev)
+            for (auto v = locVar; v && v->scopeLv == lv; v = v->prev)
             {
                 if (v->captured)
                 {
@@ -259,32 +277,42 @@ void lua::FuncInfo::AddBreakJmp(size_t pc)
     }
 }
 
-void lua::FuncInfo::AddGotoJmp(std::string label, size_t pc)
+void lua::FuncInfo::AddGotoJmp(const std::string& label, size_t pc, uint32_t line)
 {
-    // TODO
-    return;
-
-    auto& info = gotos[std::move(label)];
-    auto& labels = info.first;
-    auto lsz = labels.size();
-    auto it = lsz <= scopeLv + 1
-                  ? labels.rbegin()
-                  : std::find_if(labels.rbegin() + (lsz - scopeLv), labels.rend(), [](auto n) { return n != -1; });
-    if (labels.rend() == it)
+    const std::string* pName{};
+    auto it = std::find_if(labels.rbegin(), labels.rend(),
+                           [&](auto pset)
+                           {
+                               if (!pset)
+                                   return false;
+                               auto it = pset->find(label);
+                               auto res = it != pset->end();
+                               if (res)
+                                   pName = &(*it);
+                               return res;
+                           });
+    if (it == labels.rend())
     {
-        // wait for inner label 
-        auto& allGoto = info.second;
-        while (allGoto.size() < scopeLv + 1)
-        {
-            allGoto.emplace_back();
-        }
-        allGoto[scopeLv].emplace_back(GotoInfo{pc, CurrentLocals()});
+        Error(nullptr, line, "no visible label '" + label + "' for <goto>");
+        return;
+    }
+
+    auto& info = labelsInfo[pName];
+    if (!info)
+        info = std::make_unique<LabelInfo>(-1);
+    auto lv = (uint32_t)std::distance(it, labels.rend()) - 1;
+
+    auto i = uint32_t(Op::JMP) | GetJmpArgA(lv + 1) << 6;
+    if (info->pc == size_t(-1))
+    {
+        info = std::make_unique<LabelInfo>();
+        info->gotos.emplace_back(pc, CurrentLocal(lv));
     }
     else
     {
-        insts[pc] &= (1 << 14) - 1;
-        insts[pc] |= (*it - pc + cv::MAXARG_sBx) << 14;
-    }  
+        i |= (info->pc - pc + cv::MAXARG_sBx - 1) << 14;
+    }
+    insts[pc] = i;
 }
 
 void lua::FuncInfo::CloseOpenUpvals(uint32_t line)
@@ -293,6 +321,41 @@ void lua::FuncInfo::CloseOpenUpvals(uint32_t line)
     if (a > 0)
     {
         EmitJmp(line, a, 0);
+    }
+}
+
+void lua::FuncInfo::FixGotoSbx(const std::string& name, uint32_t line)
+{
+    auto& nameInLabel = *labels.back()->find(name);
+    auto [it, res] = labelsInfo.try_emplace(&nameInLabel, nullptr);
+    if (res)
+    {
+        it->second = std::make_unique<LabelInfo>(PC());
+    }
+    else
+    {
+        auto& info = *it->second;
+        if (info.pc == size_t(-1))
+        {
+            bool jmpInlocal = !locVars.empty() && !localScope;
+            if (jmpInlocal)
+            {
+                auto localVar = info.gotos.front().local;
+                if (localVar)
+                    jmpInlocal = locVars.back()->slot > localVar->slot;
+            }
+            if (jmpInlocal)
+            {
+                localScope = std::make_unique<LocalScopeInfo>(&nameInLabel, &locVars.back()->name, line);
+            }
+            info.pc = PC();
+            for (auto& [pc, slot] : info.gotos)
+            {
+                // insts[pc] &= (1 << 14) - 1;
+                insts[pc] |= (info.pc - pc + cv::MAXARG_sBx - 1) << 14;
+            }
+            info.gotos.clear();
+        }
     }
 }
 
@@ -588,21 +651,8 @@ const TopPrototype* lua::Prototype::Top() const
     return static_cast<const TopPrototype*>(p);
 }
 
-std::vector<slot_type> lua::FuncInfo::CurrentLocals() const
+LocVarInfo* lua::FuncInfo::CurrentLocal(uint32_t lv) const
 {
-    std::vector<slot_type> v;
-    v.resize(scopeLv + 1); 
-    
-    auto cl = scopeLv;
-    for (auto it = locVars.rbegin(); it != locVars.rend(); ++it)
-    {
-        if ((*it)->scopeLv == cl)
-        {
-            v[cl] = (*it)->slot;
-            if (0 == cl)
-                break;
-            --cl;
-        }
-    }
-    return v;
+    auto it = std::find_if(locVars.rbegin(), locVars.rend(), [&](auto& var) { return lv == var->scopeLv; });
+    return it != locVars.rend() ? it->get() : nullptr;
 }

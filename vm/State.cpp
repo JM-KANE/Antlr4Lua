@@ -410,8 +410,7 @@ size_t lua::State::GetTop()
 
 int32_t lua::State::RegisterCount()
 {
-    auto c = stack().closure;
-    return c ? c->proto->MaxStackSize : 0;
+    return stack().RegisterCount();
 }
 
 uint8_t lua::State::GetTable(int32_t idx)
@@ -573,7 +572,9 @@ void lua::State::CloseUpvalues(int32_t n)
         auto&& [i, openuv] = *it;
         if (i + 1 >= n)
         {
+            auto newVar = std::make_unique<Value>(std::move(*openuv->val));
             openuv->closed = true;
+            openuv->val = std::move(newVar);
             it = ovs.erase(it);
         }
         else
