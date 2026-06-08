@@ -134,7 +134,7 @@ public:
 private:
     /* global */
     Table registry;
-    Table global;   ///< env of main
+    Table global;  ///< env of main
     std::unique_ptr<Table> args;
 
     // TODO randomseed
@@ -158,7 +158,7 @@ public:
     bool REPL() const;
 
     Closure& NewLuaClosure(const Prototype& p);
-    Closure& NewFuncClosure(Function f, size_t nUpvals);
+    Closure& NewFuncClosure(Function* f, size_t nUpvals);
     Table& NewLuaTable(size_t nArr, size_t nRec);
 
     Table* GetArgs();

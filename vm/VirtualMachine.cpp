@@ -316,7 +316,7 @@ Closure& lua::VirtualMachine::NewLuaClosure(const Prototype& p)
     return gc.Allocate<Closure>(&p);
 }
 
-Closure& lua::VirtualMachine::NewFuncClosure(Function f, size_t nUpvals)
+Closure& lua::VirtualMachine::NewFuncClosure(Function* f, size_t nUpvals)
 {
     return gc.Allocate<Closure>(f, nUpvals);
 }

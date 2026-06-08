@@ -19,11 +19,11 @@ struct Closure
     uint8_t color{};
     std::unique_ptr<TopPrototype> topInfo;
     const Prototype* proto{};
-    Function func{};
+    Function* func{};
     std::vector<UpvaluePtr> upvals;
 
     Closure(const Prototype* p);
-    Closure(Function f, size_t nUpvals);
+    Closure(Function* f, size_t nUpvals);
 
     void Mark(std::vector<Value>& grey);
     void MarkChildren(std::vector<Value>& grey);

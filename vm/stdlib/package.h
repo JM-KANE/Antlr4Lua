@@ -12,6 +12,9 @@ namespace stdlib
 int32_t OpenPackageLib(State* ls);
 namespace package
 {
+Function Require;
+Function Loadlib;
+Function Searchpath;
 
 }  // namespace package
 

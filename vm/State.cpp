@@ -156,9 +156,9 @@ Table* lua::State::GetArgs()
     return vm->GetArgs();
 }
 
-void lua::State::RequireF(const char* modname, Function openf, bool glb)
+void lua::State::RequireF(const char* modname, Function* openf, bool glb)
 {
-    GetSubTable(cv::LUA_REGISTRYINDEX, "_LOADED");
+    GetSubTable(cv::LUA_REGISTRYINDEX, str::LUA_LOADED_TABLE);
     GetField(-1, modname);
     if (!ToBoolean(-1))
     {
@@ -195,13 +195,13 @@ void lua::State::Insert(int64_t idx)
     Rotate(idx, 1);
 }
 
-void lua::State::PushFunction(Function f)
+void lua::State::PushFunction(Function* f)
 {
     auto& c = vm->NewFuncClosure(f, 0);
     stack().Push(&c);
 }
 
-void lua::State::PushFuncClosure(Function f, int32_t n)
+void lua::State::PushFuncClosure(Function* f, int32_t n)
 {
     auto& closure = vm->NewFuncClosure(f, n);
     for (auto i = n; i > 0; i--)
@@ -482,6 +482,12 @@ uint8_t lua::State::RawGet(int32_t idx)
     return GetTable(t, *k, true);
 }
 
+uint8_t lua::State::RawGetI(int32_t idx, int64_t i)
+{
+    auto t = stack().Get(idx);
+    return GetTable(t, i, true);
+}
+
 void lua::State::SetTable(int32_t idx)
 {
     auto t = stack().Get(idx);
@@ -535,6 +541,13 @@ void lua::State::RawSet(int32_t idx)
     auto v = stack().Pop();
     auto k = stack().Pop();
     SetTable(t, *k, std::move(*v), true);
+}
+
+void lua::State::RawSetI(int32_t idx, int64_t i)
+{
+    auto t = stack().Get(idx);
+    auto v = stack().Pop();
+    SetTable(t, i, std::move(*v), true);
 }
 
 void lua::State::CreateTable(int32_t nArr, int32_t nRec)
@@ -617,7 +630,7 @@ void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
         Error2("attempt to call a %s value", TypeName(val.TypeOf()));
         Pop(nArgs + 1);
         if (nRes > 0)
-            stack().Check(nRes);       
+            stack().Check(nRes);
     }
     else if (c->proto)
     {
@@ -898,7 +911,7 @@ const char* lua::State::TypeName2(int32_t idx)
     return TypeName(Type(idx));
 }
 
-uint8_t lua::State::Type(int32_t idx)
+uint8_t lua::State::Type(int32_t idx) const
 {
     if (stack().IsValid(idx))
     {
@@ -927,6 +940,11 @@ bool lua::State::IsNoneOrNil(int32_t idx)
 bool lua::State::IsFloat(int32_t idx)
 {
     return ToFloatX(idx).second;
+}
+
+bool lua::State::IsFunction(int32_t idx) const
+{
+    return Type(idx) == cv::type::LUA_TFUNCTION;
 }
 
 bool lua::State::ToBoolean(int32_t idx)
@@ -1079,7 +1097,7 @@ Closure* lua::State::ToFunction(int32_t idx) const
         [](auto&& arg) -> Closure*
         {
             using T = std::decay_t<decltype(arg)>;
-            if constexpr ( std::is_same_v<T, Closure*>)
+            if constexpr (std::is_same_v<T, Closure*>)
                 return arg;
             else
                 return nullptr;
@@ -1230,7 +1248,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
     RunLuaClosure();
 
     bool changeToFunctionTail = !stack().closure->proto;
-    auto newRegs = changeToFunctionTail ? 0: RegisterCount();
+    auto newRegs = changeToFunctionTail ? 0 : RegisterCount();
     newStack = PopLuaStack();
     if (nRes)
     {
@@ -1242,7 +1260,7 @@ void lua::State::CallLuaClosure(int32_t nArgs, int32_t nRes, Closure* c, bool ta
             results = newStack->PopN(nTotal);
         }
         else
-        {   
+        {
             results = newStack->PopN(newStack->top - newRegs);
         }
         stack().Check(results.size());

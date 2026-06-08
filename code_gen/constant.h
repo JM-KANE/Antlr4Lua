@@ -15,6 +15,11 @@ constexpr auto LUA_MINSTACK = 20;
 constexpr auto LUAI_MAXSTACK = 1'000'000;
 constexpr auto LUA_REGISTRYINDEX = -LUAI_MAXSTACK - 1000;
 
+constexpr auto LuaUpvalueIndex(int32_t i)
+{
+    return LUA_REGISTRYINDEX - i;
+}
+
 constexpr int64_t LUA_RIDX_MAINTHREAD = 1;
 constexpr int64_t LUA_RIDX_GLOBALS = 2;
 constexpr int64_t LUA_MULTRET = -1;
@@ -35,9 +40,13 @@ constexpr uint8_t LUA_TNONE = -1;
 
 }  // namespace cv
 
+using cv::LuaUpvalueIndex;
+
 namespace str
 {
 constexpr char ENV[] = "_ENV";
+constexpr char LUA_LOADED_TABLE[] = "_LOADED";
+constexpr char LUA_PRELOAD_TABLE[] = "_PRELOAD";
 
 constexpr char INDEX[] = "__index";
 constexpr char CALL[] = "__call";

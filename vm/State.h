@@ -31,7 +31,6 @@ struct State
     TStatus LoadFile(std::string_view filename);
     TStatus LoadFileX(std::string_view filename, std::string_view mode);
 
-
     void SetEnv(int32_t idx);
 
     template <size_t N>
@@ -68,7 +67,7 @@ struct State
     }
     Table* GetArgs();
 
-    void RequireF(const char* modname, Function openf, bool glb);
+    void RequireF(const char* modname, Function* openf, bool glb);
 
     auto& stack() const
     {
@@ -78,8 +77,8 @@ struct State
     void Rotate(int64_t idx, int64_t n);
     void Insert(int64_t idx);
 
-    void PushFunction(Function f);
-    void PushFuncClosure(Function f, int32_t n);
+    void PushFunction(Function* f);
+    void PushFuncClosure(Function* f, int32_t n);
     Stack& PushLuaStack(std::unique_ptr<Stack>&& stk);
     Stack& PushLuaStack(size_t size, State* st);
     std::unique_ptr<Stack> PopLuaStack();
@@ -112,12 +111,14 @@ struct State
     bool GetMetatable(int32_t idx);
     bool GetI(int32_t idx, int64_t i);
     uint8_t RawGet(int32_t idx);
+    uint8_t RawGetI(int32_t idx, int64_t i);
     void SetTable(int32_t idx);
     void SetField(int32_t idx, std::string k);
     void SetMetatable(int32_t idx);
     void SetGlobal(std::string k);
     void SetI(int32_t idx, int64_t i);
     void RawSet(int32_t idx);
+    void RawSetI(int32_t idx, int64_t i);
     void CreateTable(int32_t nArr, int32_t nRec);
     void NewTable();
     void Copy(int32_t fromIdx, int32_t toIdx);
@@ -296,11 +297,12 @@ struct State
 
     const char* TypeName(uint8_t tp);
     const char* TypeName2(int32_t idx);
-    uint8_t Type(int32_t idx);
+    uint8_t Type(int32_t idx) const;
     bool IsNil(int32_t idx);
     bool IsNone(int32_t idx);
     bool IsNoneOrNil(int32_t idx);
     bool IsFloat(int32_t idx);
+    bool IsFunction(int32_t idx) const;
     bool ToBoolean(int32_t idx);
     int64_t ToInteger(int32_t idx);
     std::pair<int64_t, bool> ToIntegerX(int32_t idx);
@@ -338,7 +340,6 @@ struct State
     uint8_t GetTable(const Value& t, const Value& k, bool raw);
     void SetTable(const Value& t, const Value& k, Value v, bool raw);
 
-    
     bool Warn() const;
     void SetWarn(bool b);
 

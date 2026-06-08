@@ -6,8 +6,8 @@
 namespace lua
 {
 struct State;
-using Function = int32_t (*)(State*);
-using pair_type = std::pair<const char*, Function>;
+using Function = int32_t(State*);
+using pair_type = std::pair<const char*, Function*>;
 template <std::size_t N>
 using FuncReg = std::array<pair_type, N>;
 

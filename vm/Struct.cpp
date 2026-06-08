@@ -7,7 +7,7 @@ lua::Closure::Closure(const Prototype* p) : proto{p}, upvals(p->Upvalues.size())
 {
 }
 
-lua::Closure::Closure(Function f, size_t nUpvals) : func(f), upvals(nUpvals)
+lua::Closure::Closure(Function* f, size_t nUpvals) : func(f), upvals(nUpvals)
 {
 }
 
@@ -110,14 +110,17 @@ int16_t lua::Table::Put(Value&& key, Value&& val)
 
     changed = 1;
     int64_t idx = KeyToInt(key);
-    auto valPtr = std::make_unique<Value>(std::move(val));
     if (idx >= 1)
     {
         auto arrLen = arr.size();
         if (idx <= (int64_t)arrLen)
         {
-            bool isNil = valPtr->IsNil();
-            arr[idx - 1] = std::move(valPtr);
+            bool isNil = val.IsNil();
+            auto& elem = arr[idx - 1];
+            if (elem)
+                *elem = std::move(val);
+            else
+                elem = std::make_unique<Value>(std::move(val));
             if (idx == arrLen && isNil)
             {
                 // tombstone
@@ -128,12 +131,17 @@ int16_t lua::Table::Put(Value&& key, Value&& val)
         if (idx == arrLen + 1)
         {
             map.erase(key);
-            arr.emplace_back(std::move(valPtr));
+            arr.emplace_back(std::make_unique<Value>(std::move(val)));
             ExpandArray();
             return 0;
         }
     }
-    map.insert_or_assign(std::move(key), std::move(valPtr));
+    auto [it, res] = map.try_emplace(std::move(key), nullptr);
+    if (res)
+        it->second = std::make_unique<Value>(std::move(val));
+    else
+        *it->second = std::move(val);
+
     return 0;
 }
 
