@@ -1,2 +1,2 @@
-cmake --preset linux-release
-cmake --build --preset linux-release
+cmake --preset linux-debug
+cmake --build --preset linux-debug

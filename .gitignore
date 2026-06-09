@@ -7,3 +7,4 @@ dist/
 .vscode
 .vs
 CMakeUserPresets.json
+test_*.cpp

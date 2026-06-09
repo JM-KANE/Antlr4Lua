@@ -11,11 +11,13 @@ project(Antlr4Lua LANGUAGES CXX)
 #     message(STATUS "Debug: ${CMAKE_CXX_FLAGS_DEBUG}")
 # endif()
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 set(GEN_DIR ${PROJECT_SOURCE_DIR}/generated)
 set(PARSER_DIR ${PROJECT_SOURCE_DIR}/parser)
 
 include_directories(${GEN_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/parser)
+include_directories(${PARSER_DIR})
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/antlr4/runtime/Cpp)
 add_subdirectory(${PARSER_DIR})
@@ -26,7 +28,18 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/vm)
 #     ${PROJECT_SOURCE_DIR}/src/*.h
 #     ${PROJECT_SOURCE_DIR}/src/*.cpp
 # )
+set(_dummy "${CMAKE_CURRENT_BINARY_DIR}/lua_dummy.cpp")
+if(NOT EXISTS ${_dummy})
+    file(WRITE ${_dummy} "")
+endif()
 
-add_executable(luac main.cpp ${LUA_BASE} ${GEN_SRC})
+add_library(lua_shared SHARED ${_dummy})
+set_target_properties(lua_shared PROPERTIES OUTPUT_NAME "lua")
+target_link_libraries(lua_shared parser lua_vm)
 
-target_link_libraries(luac parser lua_vm)
+# add_library(lua_static STATIC ${_dummy})
+# set_target_properties(lua_static PROPERTIES OUTPUT_NAME "lua")
+# target_link_libraries(lua_static parser lua_vm)
+
+add_executable(lua main.cpp)
+target_link_libraries(lua lua_shared)

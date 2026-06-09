@@ -1,5 +1,5 @@
 #include <iostream>
-#include "vm/VirtualMachine.h"
+#include "include/alua.hpp"
 using namespace lua;
 
 #ifdef _WIN32
