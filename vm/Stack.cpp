@@ -118,7 +118,7 @@ Value lua::Stack::Get(int64_t idx) const
 {
     if (idx < cv::LUA_REGISTRYINDEX)
     {
-        auto uvIdx = LuaUpvalueIndex(idx + 1);
+        auto uvIdx = LuaUpvalueIndex((int32_t)idx + 1);
         if (!closure || uvIdx >= (int64_t)closure->upvals.size())
         {
             return nullptr;
@@ -141,7 +141,7 @@ void lua::Stack::Set(int64_t idx, Value val)
 {
     if (idx < cv::LUA_REGISTRYINDEX)
     {
-        auto uvIdx = LuaUpvalueIndex(idx + 1);
+        auto uvIdx = LuaUpvalueIndex((int32_t)idx + 1);
         if (closure && uvIdx < (int64_t)closure->upvals.size())
         {
             *closure->upvals[uvIdx]->val = std::move(val);

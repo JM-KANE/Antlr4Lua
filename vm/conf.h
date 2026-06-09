@@ -23,7 +23,7 @@ constexpr auto total_size = (length_v<Ts> + ...);
 namespace conf
 {
 
-constexpr const char LUA_DIRSEP[] = {std::filesystem::path::preferred_separator};
+constexpr const char LUA_DIRSEP[] = {std::filesystem::path::preferred_separator, 0};
 constexpr const char LUA_PATH_SEP[] = ";";
 
 template <char SEP, typename... Ts>

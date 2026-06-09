@@ -31,10 +31,9 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 struct path_iterator
 {
     const std::string* paths{};
-    const std::string* dirSep{};
     size_t start{std::string::npos};
     size_t end{std::string::npos};
-    path_iterator(const std::string& str, const std::string& sep) : paths(&str), dirSep(&sep), end(str.find(sep))
+    path_iterator(const std::string& str) : paths(&str), start(0), end(str.find(conf::LUA_PATH_SEP[0]))
     {
     }
     auto& operator++()
@@ -43,8 +42,8 @@ struct path_iterator
             paths = {};
         else
         {
-            start = end;
-            end = paths->find(*dirSep, start);
+            start = end + 1;
+            end = paths->find(conf::LUA_PATH_SEP[0], start);
         }
         return *this;
     }
@@ -54,7 +53,8 @@ struct path_iterator
     }
     std::string_view operator*() const
     {
-        return {paths->begin() + start, paths->begin() + end};
+        auto it_end = std::string::npos == end ? paths->end() : paths->begin() + end;
+        return {paths->begin() + start, it_end};
     }
 };
 
@@ -64,7 +64,7 @@ std::array<std::string, 2> searchPath(const std::string& paths, const std::strin
     auto nameSep = name;
     replace_all(nameSep, sep, dirSep);
     std::string err;
-    for (path_iterator it(paths, dirSep); it != std::default_sentinel_t(); ++it)
+    for (path_iterator it(paths); it != std::default_sentinel_t(); ++it)
     {
         std::string path(*it);
         auto pos = path.find(conf::LUA_PATH_MARK);
@@ -80,9 +80,8 @@ std::array<std::string, 2> searchPath(const std::string& paths, const std::strin
     return {"", std::move(err)};
 }
 
-void findLoader(State* ls, const std::string& name)
+bool findLoader(State* ls, const std::string& name)
 {
-
     if ((ls->GetField(LuaUpvalueIndex(1), "searchers") != cv::type::LUA_TTABLE))
     {
         ls->Error2("'package.searchers' must be a table");
@@ -90,29 +89,30 @@ void findLoader(State* ls, const std::string& name)
 
     auto errMsg = "module '" + name + "' not found:";
 
-    for (auto i = int64_t(1);; i++)
+    for (auto i = int64_t(1); i <= 2; i++)
     {
-        if (ls->RawGetI(3, i) == cv::type::LUA_TNIL)
-        {
-            ls->Pop(1);
-            ls->Error2(errMsg.c_str());
-        }
+        ls->RawGetI(3, i);
         ls->PushString(name);
         ls->Call(1, 2);
         if (ls->IsFunction(-2))
         {
-            return;
+            return true;
         }
         else if (ls->IsString(-2))
         {
             ls->Pop(1);
-            errMsg += ls->CheckString(-1);
+            errMsg += "\n\t" + ls->CheckString(-1);
         }
         else
         {
             ls->Pop(2);
         }
     }
+
+    ls->Pop(1);
+    ls->PushNil();
+    ls->Error2(errMsg.c_str());
+    return false;
 }
 
 int32_t preloadSearch(State* ls)
@@ -121,7 +121,7 @@ int32_t preloadSearch(State* ls)
     ls->GetField(cv::LUA_REGISTRYINDEX, str::LUA_PRELOAD_TABLE);
     if (ls->GetField(-1, name) == cv::type::LUA_TNIL)
     {
-        ls->PushString("\n\tno field package.preload['" + name + "']");
+        ls->PushString("no field package.preload['" + name + "']");
     }
     return 1;
 }
@@ -136,7 +136,7 @@ int32_t luaSearcher(State* ls)
         ls->Error2("'package.path' must be a string");
     }
 
-    auto [filename, errMsg] = searchPath(name, path, ".", conf::LUA_DIRSEP);
+    auto [filename, errMsg] = searchPath(path, name, ".", conf::LUA_DIRSEP);
     if (!errMsg.empty())
     {
         ls->PushString(errMsg);
@@ -150,8 +150,10 @@ int32_t luaSearcher(State* ls)
     }
     else
     {
-        return ls->Error2("error loading module '%s' from file '%s':\n\t%s", ls->CheckString(1).c_str(),
-                          filename.c_str(), ls->CheckString(-1).c_str());
+        std::ostringstream os;
+        os << "error loading module '" << ls->CheckString(1) << "' from file '" << filename << "':\n\t";
+        ls->Catch(os);
+        return ls->Error2(os.str().c_str());
     }
 }
 int32_t cSearch(State* ls)
@@ -160,13 +162,14 @@ int32_t cSearch(State* ls)
 }
 int32_t allSearch(State* ls)
 {
+    // TODO
     return 0;
 }
 
 void createSearchersTable(State* ls)
 {
     std::array serachers{preloadSearch, luaSearcher, cSearch, allSearch};
-    ls->CreateTable(serachers.size(), 0);
+    ls->CreateTable((int32_t)serachers.size(), 0);
     for (size_t i = 0; i < serachers.size(); i++)
     {
         ls->PushValue(-2);
@@ -175,6 +178,24 @@ void createSearchersTable(State* ls)
     }
     ls->SetField(-2, "searchers");
 }
+
+
+#ifdef _WIN32
+#include <windows.h>
+const std::string& GetExecPath()
+{
+    static std::string execPath;
+    if (execPath.empty())
+    {
+        char buffer[MAX_PATH];
+        GetModuleFileNameA(NULL, buffer, MAX_PATH);
+        std::string fullPath(buffer);
+        size_t lastSlash = fullPath.find_last_of(conf::LUA_DIRSEP[0]);
+        execPath = lastSlash != std::string::npos ? fullPath.substr(0, lastSlash) : "c:\\";
+    }
+    return execPath;
+}
+#endif  // #ifdef _WIN32
 
 std::string GetPath()
 {
@@ -198,7 +219,11 @@ std::string GetPath()
         return path;
     }
     else
-        return conf::LUA_PATH_DEFAULT.data();
+    {
+        std::string path = conf::LUA_PATH_DEFAULT.data();
+        replace_all(path, conf::LUA_EXEC_DIR, GetExecPath());
+        return path;   
+    }
 }
 std::string GetCPath()
 {
@@ -219,10 +244,14 @@ std::string GetCPath()
             std::replace(std::begin(str), std::end(str), ':', ';');
             return str;
         }
-        return path;
+        return path;                                  
     }
     else
-        return conf::LUA_CPATH_DEFAULT.data();
+    {
+        std::string path = conf::LUA_CPATH_DEFAULT.data();
+        replace_all(path, conf::LUA_EXEC_DIR, GetExecPath());
+        return path;   
+    }
 }
 
 }  // namespace
@@ -252,7 +281,7 @@ int32_t lua::stdlib::OpenPackageLib(State* ls)
     ls->PushValue(-2);
     ls->SetFuncs(llFuncs, 1);
     ls->Pop(1);
-    return 0;
+    return 1;
 }
 
 int32_t lua::stdlib::package::Require(State* ls)
@@ -267,7 +296,10 @@ int32_t lua::stdlib::package::Require(State* ls)
     }
 
     ls->Pop(1);
-    findLoader(ls, name);
+    if (!findLoader(ls, name))
+    {
+        return 1;
+    }
     ls->PushString(name);
     ls->Insert(-2);
     ls->Call(2, 1);
@@ -275,7 +307,7 @@ int32_t lua::stdlib::package::Require(State* ls)
     {
         ls->SetField(2, name);
     }
-    if (ls->GetField(2, name) == cv::type::LUA_TNIL)
+    else if (ls->GetField(2, name) == cv::type::LUA_TNIL)
     {
         ls->PushBoolean(true);
         ls->PushValue(-1);
@@ -295,7 +327,7 @@ int32_t lua::stdlib::package::Searchpath(State* ls)
     auto path = ls->CheckString(2);
     auto sep = ls->OptString(3, ".");
     auto rep = ls->OptString(4, conf::LUA_DIRSEP);
-    if (auto [filename, errMsg] = searchPath(name, path, sep, rep); errMsg.empty())
+    if (auto [filename, errMsg] = searchPath(path, name, sep, rep); errMsg.empty())
     {
         ls->PushString(filename);
         return 1;

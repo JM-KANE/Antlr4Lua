@@ -269,6 +269,10 @@ struct State
     template <typename... Ts>
     int32_t Error2(const char* fmt, Ts... args)
     {
+        if (exception)
+        {
+            return 0;
+        }
         std::string msg;
         if constexpr (sizeof...(args))
         {
