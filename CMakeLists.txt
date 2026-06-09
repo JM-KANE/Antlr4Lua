@@ -45,4 +45,11 @@ install(TARGETS lua lua_shared lua_vm
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
 )
-#install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lua)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/include
+    FILES_MATCHING 
+    PATTERN "*.h"
+    PATTERN "*.hpp")
+install(DIRECTORY vm/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/vm
+    FILES_MATCHING 
+    PATTERN "*.h"
+    PATTERN "*.hpp")

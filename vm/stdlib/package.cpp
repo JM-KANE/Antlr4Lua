@@ -1,10 +1,11 @@
 #include "package.h"
-using namespace lua;
-using namespace stdlib;
 #include "../State.h"
 #include "../conf.h"
-
 #include "DynamicLibrary.h"
+#include <algorithm>
+
+using namespace lua;
+using namespace stdlib;
 namespace
 {
 constexpr FuncReg<8> pkgFuncs{

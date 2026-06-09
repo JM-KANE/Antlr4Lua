@@ -1,7 +1,7 @@
 #ifndef _OP_CODE_H
 #define _OP_CODE_H
 
-#include "../code_gen/OpCodesType.h"
+#include "../include/OpCodesType.h"
 #include <array>
 
 namespace lua

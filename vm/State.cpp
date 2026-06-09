@@ -67,7 +67,7 @@ TStatus lua::State::Load(const std::string& data, std::string chunkName, std::st
     {
         if (TStatus::LUA_ERRSYNTAX == st)
         {
-            MakeError<SyntaxException>(&p, std::move(p.ec.GetErrors().front()));
+            MakeError<SyntaxException>(&p, std::move(*p.err));
         }
         return st;
     }
@@ -89,7 +89,7 @@ std::pair<TStatus, bool> lua::State::LoadStream(const std::string& data)
     {
         if (TStatus::LUA_ERRSYNTAX == st.first)
         {
-            MakeError<SyntaxException>(&p, std::move(p.ec.GetErrors().front()));
+            MakeError<SyntaxException>(&p, std::move(*p.err));
         }
         return st;
     }

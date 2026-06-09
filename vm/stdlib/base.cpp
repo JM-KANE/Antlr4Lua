@@ -2,6 +2,7 @@
 #include "table.h"
 #include "../VirtualMachine.h"
 #include "../../code_gen/number.h"
+#include <sstream>
 using namespace lua;
 using namespace stdlib;
 namespace

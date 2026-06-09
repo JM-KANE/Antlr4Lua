@@ -3,19 +3,10 @@
 
 #include "antlr4-runtime.h"
 
+#include "../include/SyntaxError.h"
+
 namespace lua
 {
-struct SyntaxError
-{
-    size_t line;
-    size_t charPositionInLine{};
-    std::string msg;
-    antlr4::Token* offendingSymbol;
-
-    SyntaxError(antlr4::Token* sym, size_t _line, std::string msg, size_t charInline = 0);
-
-    std::string Msg() const;
-};
 
 class ErrorCollector : public antlr4::BaseErrorListener
 {

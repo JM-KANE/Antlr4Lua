@@ -1,5 +1,8 @@
 #include "VirtualMachine.h"
 #include <numeric>
+#include <sstream>
+#include <algorithm>
+
 using namespace lua;
 
 lua::Collector::Collector(VirtualMachine* _vm) : vm{_vm}

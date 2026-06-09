@@ -1,7 +1,12 @@
 #ifndef _VALUE_H
 #define _VALUE_H
 
-#include "../code_gen/FuncInfo.h"
+// #include "../code_gen/FuncInfo.h"
+
+#include <variant>
+#include <memory>
+#include <vector>
+#include <unordered_map>
 
 namespace lua
 {

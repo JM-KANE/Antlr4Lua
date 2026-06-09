@@ -5,7 +5,7 @@
 
 #include "../generated/LuaParserBaseVisitor.h"
 #include "FuncInfo.h"
-#include "LuaException.h"
+#include "../include/LuaException.h"
 
 namespace lua
 {

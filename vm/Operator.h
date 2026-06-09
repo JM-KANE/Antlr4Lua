@@ -2,6 +2,7 @@
 #define _OPERATOR_H
 
 #include "Value.h"
+#include "../include/constant.h"
 #include <utility>
 #include <cmath>
 #include <functional>

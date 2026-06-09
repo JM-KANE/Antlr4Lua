@@ -4,6 +4,7 @@
 #include "State.h"
 #include <forward_list>
 #include <tuple>
+#include <iostream>
 
 namespace lua
 {

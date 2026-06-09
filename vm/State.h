@@ -2,7 +2,7 @@
 #define _STATE_H
 
 #include "Stack.h"
-#include "../code_gen/LuaException.h"
+#include "../include/LuaException.h"
 #include "Operator.h"
 namespace lua
 {

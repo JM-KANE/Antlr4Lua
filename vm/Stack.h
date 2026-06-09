@@ -2,6 +2,7 @@
 #define _STACK_H
 
 #include "Struct.h"
+#include "../include/Prototype.h"
 
 namespace lua
 {

@@ -3,55 +3,14 @@
 
 #include <vector>
 #include <memory>
-#include "type.h"
-#include "OpCodesType.h"
+#include "../include/type.h"
+#include "../include/OpCodesType.h"
 
-#include "../generated/LuaParser.h"
+#include "../include/Prototype.h"
 
 namespace lua
 {
 using slot_type = int16_t;
-
-// TODO chunk and header
-struct TopPrototype;
-struct Prototype
-{
-    struct Upvalue
-    {
-        uint8_t Instack;
-        uint8_t Idx;
-    };
-    struct LocVar
-    {
-        std::string VarName;
-        uint32_t StartPC{};
-        uint32_t EndPC{};
-    };
-
-    Prototype* Parent{};
-    uint32_t LineDefined{};
-    uint32_t LastLineDefined{};
-    uint8_t NumParams{};
-    uint8_t IsVararg{};
-    uint8_t MaxStackSize{};
-    std::vector<uint32_t> Code;
-    std::vector<any_type> Constants;
-    std::vector<Upvalue> Upvalues;
-    std::vector<Prototype> Protos;
-    std::vector<uint32_t> LineInfo;
-    std::vector<LocVar> LocVars;
-    std::vector<std::string> UpvalueNames;
-
-    const TopPrototype* Top() const;
-};
-struct TopPrototype : Prototype
-{
-    ErrorCollector ec;
-    std::string Source;
-
-    void PrintError(std::ostream&);
-    std::string ShortSource() const;
-};
 
 struct UpvalInfo
 {
@@ -86,10 +45,11 @@ struct LabelInfo
 };
 
 using LocalScopeInfo = std::tuple<const std::string*, const std::string*, uint32_t>;
-
+class LuaRuleContext;
 struct FuncInfo
 {
-    using block_labels = const LuaParserBase::block_labels*;
+    using block_labels_ast = std::unordered_set<std::string>;
+    using block_labels = const block_labels_ast*;
 
     FuncInfo* parent{};
     std::vector<std::unique_ptr<FuncInfo>> subFuncs;
@@ -112,7 +72,7 @@ struct FuncInfo
     const uint32_t lastLine{};
     uint32_t numParams{};
     bool isVararg = true;
-    ErrorCollector* ec{};
+    std::unique_ptr<SyntaxError>* ec{};
 
     // FuncInfo() = default;
     FuncInfo(LuaRuleContext* node, FuncInfo* p = {});
@@ -128,7 +88,8 @@ struct FuncInfo
     template <typename... Ts>
     void Error(Ts&&... args)
     {
-        ec->CompileError(std::forward<Ts>(args)...);
+        // ec->CompileError(std::forward<Ts>(args)...);
+        *ec = std::make_unique<SyntaxError>(std::forward<Ts>(args)...);
     }
     bool ReleaseScopeError();
 

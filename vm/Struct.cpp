@@ -1,5 +1,6 @@
 #include "Struct.h"
-#include "cmath"
+#include "../code_gen/FuncInfo.h"
+#include <cmath>
 
 using namespace lua;
 

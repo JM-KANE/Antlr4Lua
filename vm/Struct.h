@@ -6,6 +6,9 @@
 
 namespace lua
 {
+
+struct Prototype;
+struct TopPrototype;
 struct Upvalue
 {
     ValuePtr val;

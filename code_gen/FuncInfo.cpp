@@ -1,26 +1,7 @@
 #include "FuncInfo.h"
+#include "../parser/LuaRuleContext.h"
+#include <algorithm>
 using namespace lua;
-
-void lua::TopPrototype::PrintError(std::ostream& os)
-{
-    for (auto&& err : ec.GetErrors())
-    {
-        os << ShortSource() << err.Msg() << std::endl;
-    }
-    ec.Clear();
-}
-
-std::string lua::TopPrototype::ShortSource() const
-{
-    if (!Source.empty() && (Source.front() == '@' || Source.front() == '='))
-    {
-        return Source.substr(1);
-    }
-    std::string src = "[string \"";
-    src += Source;
-    src += "\"]";
-    return src;
-}
 
 lua::LocVarInfo::LocVarInfo(std::string n, uint32_t slv, slot_type st, size_t s, size_t e)
     : name(std::move(n)),
@@ -638,16 +619,6 @@ void lua::FuncInfo::ToSubProtos(Prototype& p)
         fi->ToProto(v.emplace_back());
         v.back().Parent = &p;
     }
-}
-
-const TopPrototype* lua::Prototype::Top() const
-{
-    auto p = this;
-    while (p->Parent)
-    {
-        p = p->Parent;
-    }
-    return static_cast<const TopPrototype*>(p);
 }
 
 LocVarInfo* lua::FuncInfo::CurrentLocal(uint32_t lv) const

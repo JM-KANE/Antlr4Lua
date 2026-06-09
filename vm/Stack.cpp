@@ -1,5 +1,7 @@
 #include "State.h"
 #include "Stack.h"
+#include "../code_gen/FuncInfo.h"
+#include <algorithm>
 
 using namespace lua;
 

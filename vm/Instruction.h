@@ -1,6 +1,6 @@
 #ifndef _INSTRUCTION_H
 #define _INSTRUCTION_H
-#include "../code_gen/OpCodesType.h"
+#include "../include/OpCodesType.h"
 #include <array>
 
 namespace lua

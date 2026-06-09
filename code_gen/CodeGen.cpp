@@ -421,11 +421,12 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
 {
     antlr4::ANTLRInputStream input(data);
     LuaLexer lexer(&input);
-    lexer.addErrorListener(&proto.ec);
+    ErrorCollector ec;
+    lexer.addErrorListener(&ec);
     antlr4::CommonTokenStream tokens(&lexer);
     LuaParser parser(&tokens);
     this->parser = &parser;
-    parser.addErrorListener(&proto.ec);
+    parser.addErrorListener(&ec);
     return GenerateProto(parser, proto);
 }
 
@@ -433,11 +434,12 @@ std::pair<TStatus, bool> lua::CodeGen::GenerateREPL(const std::string& data, Top
 {
     antlr4::ANTLRInputStream input(data);
     LuaLexer lexer(&input);
-    lexer.addErrorListener(&proto.ec);
+    ErrorCollector ec;
+    lexer.addErrorListener(&ec);
     antlr4::CommonTokenStream tokens(&lexer);
     LuaParser parser(&tokens);
     this->parser = &parser;
-    parser.addErrorListener(&proto.ec);
+    parser.addErrorListener(&ec);
     parser.SetREPL();
     auto errStrategy = std::make_shared<IncompleteErrorStrategy>();
     parser.setErrorHandler(errStrategy);
@@ -449,13 +451,13 @@ std::pair<TStatus, bool> lua::CodeGen::GenerateREPL(const std::string& data, Top
 TStatus lua::CodeGen::GenerateProto(LuaParser& parser, TopPrototype& proto)
 {
     auto start = parser.start_();
-    if (proto.ec.HasErrors())
+    if (proto.err)
     {
         return TStatus::LUA_ERRSYNTAX;
     }
     auto ck = start->chunk();
     root = std::make_unique<FuncInfo>(ck);
-    root->ec = &proto.ec;
+    root->ec = &proto.err;
     root->AddLocVar(str::ENV, 0);
     fi = root.get();
     if (parser.IsREPL())
@@ -463,7 +465,7 @@ TStatus lua::CodeGen::GenerateProto(LuaParser& parser, TopPrototype& proto)
     else
         ck->accept(this);
     root->subFuncs.front()->ToProto(proto);
-    if (proto.ec.HasErrors())
+    if (proto.err)
     {
         return TStatus::LUA_ERRSYNTAX;
     }
