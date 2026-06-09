@@ -88,7 +88,7 @@ void lua::Stack::PushN(const std::vector<ValuePtr>& vals, int64_t n, size_t star
     for (size_t i = 0; i < size_t(n); i++)
     {
         auto j = i + start;
-        Push(j < nV ? vals[j] : Value::Nil());
+        Push(j < nV ? std::make_unique<Value>(*vals[j]) : Value::Nil());
     }
 }
 
