@@ -24,10 +24,6 @@ add_subdirectory(${PARSER_DIR})
 add_subdirectory(${PROJECT_SOURCE_DIR}/code_gen)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vm)
 
-# file(GLOB SRC_FILE
-#     ${PROJECT_SOURCE_DIR}/src/*.h
-#     ${PROJECT_SOURCE_DIR}/src/*.cpp
-# )
 set(_dummy "${CMAKE_CURRENT_BINARY_DIR}/lua_dummy.cpp")
 if(NOT EXISTS ${_dummy})
     file(WRITE ${_dummy} "")

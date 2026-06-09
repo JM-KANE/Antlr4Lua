@@ -2,6 +2,7 @@
 #define RUN_EXCEPTION_H
 #include "type.h"
 #include "Prototype.h"
+#include <iostream>
 namespace lua
 {
 struct TopPrototype;
