@@ -2,8 +2,7 @@
 /* cspell: ignore antlr, longlong, ULONGLONG, MAXDB */
 
 #include "antlr4-runtime.h"
-#include "LuaParserBase.h"
-#include "LuaParser.h"
+#include "../generated/LuaParser.h"
 using namespace lua;
 
 LuaParserBase::LuaParserBase(antlr4::TokenStream* input) : Parser(input)
@@ -28,10 +27,10 @@ std::pair<const std::string*, bool> lua::LuaParserBase::AddLabel(std::string&& l
     return {&(*it), ok};
 }
 
-void lua::LuaParserBase::CheckLabel(std::string&& l) 
+void lua::LuaParserBase::CheckLabel(std::string&& l)
 {
     auto it =
-        std::find_if(std::next(blocksStack.rbegin()), blocksStack.rend(), [&](const auto b) { return HasLabel(b, l); });   
+        std::find_if(std::next(blocksStack.rbegin()), blocksStack.rend(), [&](const auto b) { return HasLabel(b, l); });
     const std::string* name{&l};
     if (it == blocksStack.rend())
     {

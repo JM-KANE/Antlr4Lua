@@ -10,8 +10,8 @@ options {
 }
 
 @header {
-#include "LuaParserBase.h"
-#include "LuaRuleContext.h"
+#include "../parser/LuaParserBase.h"
+#include "../parser/LuaRuleContext.h"
 }
 
 @parser::members {

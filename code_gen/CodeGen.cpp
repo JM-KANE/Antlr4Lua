@@ -1,8 +1,8 @@
 #include "CodeGen.h"
 #include "number.h"
-#include "LuaLexer.h"
-#include "LuaParser.h"
-#include "IncompleteErrorStrategy.h"
+#include "../generated/LuaLexer.h"
+#include "../generated/LuaParser.h"
+#include "../parser/IncompleteErrorStrategy.h"
 
 using namespace lua;
 using namespace lua::number;
@@ -611,8 +611,8 @@ std::any lua::CodeGen::visitEvalexpblock(LuaParser::EvalexpblockContext* ctx)
     return std::any();
 }
 
-void lua::CodeGen::VisitStatements(const std::vector<LuaParser::StatContext*>& stats,
-                                   LuaParser::RetstatContext* ret, LuaParser::BlockContext* b)
+void lua::CodeGen::VisitStatements(const std::vector<LuaParser::StatContext*>& stats, LuaParser::RetstatContext* ret,
+                                   LuaParser::BlockContext* b)
 {
     fi->labels.push_back(parser->GetLabels(b));
     for (auto& stat : stats)
@@ -620,7 +620,7 @@ void lua::CodeGen::VisitStatements(const std::vector<LuaParser::StatContext*>& s
         if (stat->getAltNumber() != (size_t)LuaRuleContext::Stat::Label_ && fi->ReleaseScopeError())
         {
             fi->labels.pop_back();
-            return ;
+            return;
         }
         stat->accept(this);
     }
@@ -643,7 +643,7 @@ bool lua::CodeGen::visitChunkREPL(LuaParser::ChunkContext* ctx)
     if (1 == an)
     {
         auto& subFi = *fi->subFuncs.emplace_back(std::make_unique<FuncInfo>(ctx, fi));
-        fi = &subFi;    
+        fi = &subFi;
         auto block = static_cast<LuaParser::NormalblockContext*>(ctx)->block();
         auto stats = block->stat();
         auto ret = block->retstat();
@@ -837,8 +837,8 @@ std::any lua::CodeGen::visitFunctioncall_(LuaParser::Functioncall_Context* ctx)
 }
 
 std::any lua::CodeGen::visitLabel(LuaParser::LabelContext* ctx)
-{       
-    fi->FixGotoSbx(ctx->NAME()->getText(), ctx->Line());                                      
+{
+    fi->FixGotoSbx(ctx->NAME()->getText(), ctx->Line());
     return {};
 }
 

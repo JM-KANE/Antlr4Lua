@@ -1,6 +1,5 @@
 #include "antlr4-runtime.h"
-#include "LuaLexerBase.h"
-#include "LuaLexer.h"
+#include "../generated/LuaLexer.h"
 
 using namespace lua;
 

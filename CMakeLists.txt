@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 
 project(Antlr4Lua LANGUAGES CXX)
 
@@ -16,8 +16,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(GEN_DIR ${PROJECT_SOURCE_DIR}/generated)
 set(PARSER_DIR ${PROJECT_SOURCE_DIR}/parser)
 
-include_directories(${GEN_DIR})
-include_directories(${PARSER_DIR})
+# include_directories(${GEN_DIR})
+# include_directories(${PARSER_DIR})
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/antlr4/runtime/Cpp)
 add_subdirectory(${PARSER_DIR})
@@ -37,9 +37,12 @@ add_library(lua_shared SHARED ${_dummy})
 set_target_properties(lua_shared PROPERTIES OUTPUT_NAME "lua")
 target_link_libraries(lua_shared parser lua_vm)
 
-# add_library(lua_static STATIC ${_dummy})
-# set_target_properties(lua_static PROPERTIES OUTPUT_NAME "lua")
-# target_link_libraries(lua_static parser lua_vm)
-
 add_executable(lua main.cpp)
 target_link_libraries(lua lua_shared)
+
+
+install(TARGETS lua lua_shared lua_vm
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+)
+#install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lua)

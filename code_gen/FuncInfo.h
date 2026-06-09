@@ -6,7 +6,7 @@
 #include "type.h"
 #include "OpCodesType.h"
 
-#include "LuaParser.h"
+#include "../generated/LuaParser.h"
 
 namespace lua
 {

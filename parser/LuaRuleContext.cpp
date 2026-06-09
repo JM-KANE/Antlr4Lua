@@ -1,4 +1,4 @@
-#include "LuaParser.h"
+#include "../generated/LuaParser.h"
 #include "LuaRuleContext.h"
 using namespace lua;
 void LuaRuleContext::FixAltNum() const

@@ -3,7 +3,7 @@
 
 #include <array>
 
-#include "LuaParserBaseVisitor.h"
+#include "../generated/LuaParserBaseVisitor.h"
 #include "FuncInfo.h"
 #include "LuaException.h"
 
