@@ -179,7 +179,6 @@ void createSearchersTable(State* ls)
     ls->SetField(-2, "searchers");
 }
 
-
 #ifdef _WIN32
 #include <windows.h>
 const std::string& GetExecPath()
@@ -221,8 +220,10 @@ std::string GetPath()
     else
     {
         std::string path = conf::LUA_PATH_DEFAULT.data();
+#ifdef _WIN32
         replace_all(path, conf::LUA_EXEC_DIR, GetExecPath());
-        return path;   
+#endif
+        return path;
     }
 }
 std::string GetCPath()
@@ -244,13 +245,15 @@ std::string GetCPath()
             std::replace(std::begin(str), std::end(str), ':', ';');
             return str;
         }
-        return path;                                  
+        return path;
     }
     else
     {
         std::string path = conf::LUA_CPATH_DEFAULT.data();
+#ifdef _WIN32
         replace_all(path, conf::LUA_EXEC_DIR, GetExecPath());
-        return path;   
+#endif
+        return path;
     }
 }
 
