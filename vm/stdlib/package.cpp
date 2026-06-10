@@ -69,8 +69,15 @@ std::array<std::string, 2> searchPath(const std::string& paths, const std::strin
     for (path_iterator it(paths); it != std::default_sentinel_t(); ++it)
     {
         std::string path(*it);
+        if (path.empty())
+        {
+            continue;
+        }
         auto pos = path.find(conf::LUA_PATH_MARK);
-        path.replace(pos, 1, nameSep);
+        if (std::string::npos != pos)
+        {
+            path.replace(pos, 1, nameSep);
+        }
         if (std::filesystem::exists(path))
         {
             return {std::move(path), ""};
@@ -371,8 +378,9 @@ int32_t lua::stdlib::package::Require(State* ls)
     ls->PushString(name);
     ls->Insert(-2);
     ls->Call(2, 1);
-    if (!ls->IsNil(-1))
+    if (!ls->IsNil(-1))  
     {
+        ls->PushValue(-1);
         ls->SetField(2, name);
         ls->PushString(std::move(filename));
     }

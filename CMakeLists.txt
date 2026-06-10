@@ -43,11 +43,9 @@ add_executable(lua main.cpp)
 target_link_libraries(lua lua_shared)
 
 if(WIN32)
-    add_custom_command(TARGET lua POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:lua_vm>"
-            "$<TARGET_FILE_DIR:lua>"
-        COMMENT "Copying lua_vm.dll to lua.exe output directory"
+    set_target_properties(lua_vm PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG   "$<TARGET_FILE_DIR:lua>"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "$<TARGET_FILE_DIR:lua>"
     )
 endif()
 
@@ -60,6 +58,7 @@ set_target_properties(lua PROPERTIES
 install(TARGETS lua lua_shared lua_vm
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
 )
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/include
     FILES_MATCHING 
