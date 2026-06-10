@@ -14,7 +14,7 @@ project(Antlr4Lua LANGUAGES CXX)
 #     message(STATUS "Debug: ${CMAKE_CXX_FLAGS_DEBUG}")
 # endif()
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+#set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(GEN_DIR ${PROJECT_SOURCE_DIR}/generated)
 set(PARSER_DIR ${PROJECT_SOURCE_DIR}/parser)
@@ -34,18 +34,11 @@ endif()
 
 add_library(lua_shared SHARED ${_dummy})
 set_target_properties(lua_shared PROPERTIES OUTPUT_NAME "lua")
-target_link_libraries(lua_shared parser lua_vm)
+target_link_libraries(lua_shared lua_vm)
 set_target_properties(lua_shared PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_executable(lua main.cpp)
-target_link_libraries(lua parser lua_vm)
-
-if(WIN32)
-    set_target_properties(lua_vm PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG   "$<TARGET_FILE_DIR:lua>"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE "$<TARGET_FILE_DIR:lua>"
-    )
-endif()
+target_link_libraries(lua lua_vm)
 
 set_target_properties(lua PROPERTIES 
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -53,7 +46,7 @@ set_target_properties(lua PROPERTIES
 
 
 # install
-install(TARGETS lua lua_shared lua_vm
+install(TARGETS lua lua_shared lua_vm code_gen parser
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
