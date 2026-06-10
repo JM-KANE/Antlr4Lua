@@ -1,3 +1,4 @@
+#include "Stack.h"
 #include "State.h"
 #include "Stack.h"
 #include "../code_gen/FuncInfo.h"
@@ -29,6 +30,19 @@ void lua::Stack::Check(size_t n)
     for (size_t i = free; i < n; i++)
     {
         slots.emplace_back(Value::Nil());
+    }
+}
+
+void lua::Stack::RepairNullptr(size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+    {
+        if (slots[top])
+        {
+            ++top;
+            continue;
+        }
+        Push(Value::Nil());
     }
 }
 

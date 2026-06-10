@@ -630,7 +630,10 @@ void lua::State::DoCall(int32_t nArgs, int32_t nRes, bool tail)
         Error2("attempt to call a %s value", TypeName(val.TypeOf()));
         Pop(nArgs + 1);
         if (nRes > 0)
+        {
             stack().Check(nRes);
+            stack().RepairNullptr(nRes);
+        }
     }
     else if (c->proto)
     {

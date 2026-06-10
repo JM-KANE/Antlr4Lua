@@ -23,6 +23,7 @@ struct Stack
     uint32_t CurrentLine() const;
 
     void Check(size_t n);
+    void RepairNullptr(size_t n);
     Value& Push(ValuePtr&& val);
     Value& Push(const ValuePtr& val);
     template <typename T>
