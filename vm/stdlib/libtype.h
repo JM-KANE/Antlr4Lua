@@ -7,9 +7,9 @@ namespace lua
 {
 struct State;
 using Function = int32_t(State*);
-using pair_type = std::pair<const char*, Function*>;
+using Reg = std::pair<const char*, Function*>;
 template <std::size_t N>
-using FuncReg = std::array<pair_type, N>;
+using FuncReg = std::array<Reg, N>;
 
 template <template <typename> class F, typename Tuple>
 struct tuple_map;

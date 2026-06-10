@@ -8,7 +8,7 @@ using namespace stdlib;
 namespace
 {
 constexpr FuncReg<26> baseFuncs{
-    pair_type{"print", base::Print},
+    Reg{"print", base::Print},
     {"assert", base::Assert},
     {"error", base::Error},
     {"warn", base::Warn},

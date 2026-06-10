@@ -139,9 +139,9 @@ void lua::State::SetEnv(int32_t idx)
 void lua::State::OpenLibs()
 {
     constexpr FuncReg<8> A{
-        pair_type{"_G", stdlib::OpenBaseLib}, {"math", stdlib::OpenMathLib},           {"table", stdlib::OpenTableLib},
-        {"string", stdlib::OpenStringLib},    {"utf8", stdlib::OpenUTF8Lib},           {"os", stdlib::OpenOSLib},
-        {"package", stdlib::OpenPackageLib},  {"coroutine", stdlib::OpenCoroutineLib},
+        Reg{"_G", stdlib::OpenBaseLib},      {"math", stdlib::OpenMathLib},           {"table", stdlib::OpenTableLib},
+        {"string", stdlib::OpenStringLib},   {"utf8", stdlib::OpenUTF8Lib},           {"os", stdlib::OpenOSLib},
+        {"package", stdlib::OpenPackageLib}, {"coroutine", stdlib::OpenCoroutineLib},
     };
 
     for (auto&& [name, f] : A)

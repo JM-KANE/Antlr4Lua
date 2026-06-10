@@ -9,16 +9,10 @@ using namespace stdlib;
 namespace
 {
 constexpr FuncReg<8> pkgFuncs{
-    pair_type{"config", nullptr},
-    {"cpath", nullptr},
-    {"loaded", nullptr},
-    {"loadlib", package::Loadlib},
-    {"path", nullptr},
-    {"preload", nullptr},
-    {"searchers", nullptr},
-    {"searchpath", package::Searchpath},
+    Reg{"config", nullptr}, {"cpath", nullptr},   {"loaded", nullptr},    {"loadlib", package::Loadlib},
+    {"path", nullptr},      {"preload", nullptr}, {"searchers", nullptr}, {"searchpath", package::Searchpath},
 };
-constexpr FuncReg<1> llFuncs{pair_type{"require", package::Require}};
+constexpr FuncReg<1> llFuncs{Reg{"require", package::Require}};
 
 void replace_all(std::string& str, const std::string& from, const std::string& to)
 {
@@ -135,7 +129,7 @@ bool findLoader(State* ls, const std::string& name)
 
     auto errMsg = "module '" + name + "' not found:";
 
-    for (auto i = int64_t(1); i <= 3; i++)
+    for (auto i = int64_t(1); i <= 4; i++)
     {
         ls->RawGetI(3, i);
         ls->PushString(name);
@@ -378,7 +372,7 @@ int32_t lua::stdlib::package::Require(State* ls)
     ls->PushString(name);
     ls->Insert(-2);
     ls->Call(2, 1);
-    if (!ls->IsNil(-1))  
+    if (!ls->IsNil(-1))
     {
         ls->PushValue(-1);
         ls->SetField(2, name);

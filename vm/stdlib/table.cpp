@@ -5,8 +5,8 @@ using namespace stdlib;
 
 namespace
 {
-constexpr FuncReg<7> tabFuncs{pair_type{"move", table::Move}, {"insert", table::Insert}, {"remove", table::Remove},
-                              {"sort", table::Sort},          {"concat", table::Concat}, {"pack", table::Pack},
+constexpr FuncReg<7> tabFuncs{Reg{"move", table::Move}, {"insert", table::Insert}, {"remove", table::Remove},
+                              {"sort", table::Sort},    {"concat", table::Concat}, {"pack", table::Pack},
                               {"unpack", table::Unpack}};
 
 constexpr size_t MAX_LEN = 1'000'000;  // ?

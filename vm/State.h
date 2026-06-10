@@ -40,6 +40,11 @@ struct State
         // CheckStack2(snup, "too many upvalues");
         for (auto&& [name, fun] : l)
         {
+            if (!name)
+            {
+                continue;
+            }
+
             for (size_t i = 0; i < nup; i++)
             {
                 PushValue(-snup);
