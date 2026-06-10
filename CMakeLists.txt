@@ -14,13 +14,10 @@ project(Antlr4Lua LANGUAGES CXX)
 #     message(STATUS "Debug: ${CMAKE_CXX_FLAGS_DEBUG}")
 # endif()
 
-#set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(GEN_DIR ${PROJECT_SOURCE_DIR}/generated)
 set(PARSER_DIR ${PROJECT_SOURCE_DIR}/parser)
-
-# include_directories(${GEN_DIR})
-# include_directories(${PARSER_DIR})
 
 add_subdirectory(${PARSER_DIR})
 add_subdirectory(${PROJECT_SOURCE_DIR}/code_gen)
@@ -32,21 +29,25 @@ if(NOT EXISTS ${_dummy})
     file(WRITE ${_dummy} "")
 endif()
 
+set(LIB_OBJECT lua_vm code_gen parser)
+
 add_library(lua_shared SHARED ${_dummy})
 set_target_properties(lua_shared PROPERTIES OUTPUT_NAME "lua")
-target_link_libraries(lua_shared lua_vm)
+target_link_libraries(lua_shared ${LIB_OBJECT})
 set_target_properties(lua_shared PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_executable(lua main.cpp)
-target_link_libraries(lua lua_vm)
+target_link_libraries(lua ${LIB_OBJECT})
 
 set_target_properties(lua PROPERTIES 
     VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
-
 # install
-install(TARGETS lua lua_shared lua_vm code_gen parser
+
+
+set(LIB_INSTALL lua lua_shared)
+install(TARGETS ${LIB_INSTALL}
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib

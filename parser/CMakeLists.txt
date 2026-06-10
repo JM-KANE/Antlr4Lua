@@ -49,6 +49,6 @@ add_custom_command(
     COMMENT "Generating source file"     
 )
 
-add_library(parser STATIC ${GEN_SRC} ${LUA_BASE})
+add_library(parser OBJECT ${GEN_SRC} ${LUA_BASE})
 
 target_link_libraries(parser antlr4_static)
