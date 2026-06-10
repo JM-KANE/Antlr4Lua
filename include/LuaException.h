@@ -2,7 +2,6 @@
 #define RUN_EXCEPTION_H
 #include "type.h"
 #include "Prototype.h"
-#include <iostream>
 namespace lua
 {
 struct TopPrototype;
@@ -102,10 +101,6 @@ struct ErrorException : public Exception
 };
 
 //
-inline auto& operator<<(std::ostream& os, const Exception& e)
-{
-    return os << e.ToString();
-}
 
 }  // namespace lua
 

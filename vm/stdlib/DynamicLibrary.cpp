@@ -4,7 +4,6 @@ namespace lua
 {
 
 #ifdef _WIN32
-#include <windows.h>
 auto loadLib(const char* path)
 {
     return LoadLibrary(TEXT(path));
@@ -14,7 +13,6 @@ constexpr auto getFunction = GetProcAddress;
 constexpr auto closeLib = FreeLibrary;
 constexpr auto libError = GetLastError;
 #else
-#include <dlfcn.h>
 auto loadLib(const char* path)
 {
     return dlopen(path, RTLD_NOW);

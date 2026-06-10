@@ -717,7 +717,7 @@ TStatus lua::State::Catch(std::ostream& os)
     if (exception)
     {
         auto st = exception->Status();
-        os << *exception;
+        os << exception->ToString();
         exception.reset();
         return st;
     }

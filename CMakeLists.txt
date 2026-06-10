@@ -35,11 +35,10 @@ endif()
 add_library(lua_shared SHARED ${_dummy})
 set_target_properties(lua_shared PROPERTIES OUTPUT_NAME "lua")
 target_link_libraries(lua_shared parser lua_vm)
-
 set_target_properties(lua_shared PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_executable(lua main.cpp)
-target_link_libraries(lua lua_shared)
+target_link_libraries(lua parser lua_vm)
 
 if(WIN32)
     set_target_properties(lua_vm PROPERTIES
