@@ -1,3 +1,6 @@
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/parser/antlr4/runtime/Cpp)
+
 set(GEN_SRC 
     ${GEN_DIR}/LuaLexer.cpp
     ${GEN_DIR}/LuaLexer.h
@@ -35,7 +38,6 @@ set(LUA_BASE
     ${PARSER_DIR}/IncompleteErrorStrategy.h
 )
 
-# set(ANTLR java -Xmx500M -cp "/usr/local/lib/antlr-4.13.2-complete.jar" org.antlr.v4.Tool)
 set(ANTLR java -Xmx500M -cp ${ANTLR_PATH} org.antlr.v4.Tool)
 add_custom_command(
     OUTPUT 

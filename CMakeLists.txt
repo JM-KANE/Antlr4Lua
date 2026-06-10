@@ -22,7 +22,6 @@ set(PARSER_DIR ${PROJECT_SOURCE_DIR}/parser)
 # include_directories(${GEN_DIR})
 # include_directories(${PARSER_DIR})
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/antlr4/runtime/Cpp)
 add_subdirectory(${PARSER_DIR})
 add_subdirectory(${PROJECT_SOURCE_DIR}/code_gen)
 add_subdirectory(${PROJECT_SOURCE_DIR}/vm)
