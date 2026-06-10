@@ -56,7 +56,7 @@ public:
 
     TStatus Generate(const std::string& data, TopPrototype& proto);
     std::pair<TStatus, bool> GenerateREPL(const std::string& data, TopPrototype& proto);
-    TStatus GenerateProto(LuaParser& parser, TopPrototype& proto);
+    TStatus GenerateProto(LuaParser& parser, TopPrototype& proto, ErrorCollector* ec);
 
     void DoReturn(const std::vector<LuaParser::ExpContext*>& exps, uint32_t line);
     std::any DoVisitFuncbody(LuaParser::FuncbodyContext* ctx, bool self);

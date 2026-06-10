@@ -427,7 +427,7 @@ TStatus lua::CodeGen::Generate(const std::string& data, TopPrototype& proto)
     LuaParser parser(&tokens);
     this->parser = &parser;
     parser.addErrorListener(&ec);
-    return GenerateProto(parser, proto);
+    return GenerateProto(parser, proto, &ec);
 }
 
 std::pair<TStatus, bool> lua::CodeGen::GenerateREPL(const std::string& data, TopPrototype& proto)
@@ -444,15 +444,16 @@ std::pair<TStatus, bool> lua::CodeGen::GenerateREPL(const std::string& data, Top
     auto errStrategy = std::make_shared<IncompleteErrorStrategy>();
     parser.setErrorHandler(errStrategy);
 
-    auto st = GenerateProto(parser, proto);
+    auto st = GenerateProto(parser, proto, &ec);
     return {st, errStrategy->InComplete()};
 }
 
-TStatus lua::CodeGen::GenerateProto(LuaParser& parser, TopPrototype& proto)
+TStatus lua::CodeGen::GenerateProto(LuaParser& parser, TopPrototype& proto, ErrorCollector* ec)
 {
     auto start = parser.start_();
-    if (proto.err)
+    if (ec->HasErrors())
     {
+        proto.err = std::make_unique<SyntaxError>(std::move(ec->GetErrors().front()));
         return TStatus::LUA_ERRSYNTAX;
     }
     auto ck = start->chunk();
