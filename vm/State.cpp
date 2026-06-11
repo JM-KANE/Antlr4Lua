@@ -945,6 +945,11 @@ bool lua::State::IsFloat(int32_t idx)
     return ToFloatX(idx).second;
 }
 
+bool lua::State::IsBoolean(int32_t idx)
+{
+    return Type(idx) == cv::type::LUA_TBOOLEAN;
+}
+
 bool lua::State::IsFunction(int32_t idx) const
 {
     return Type(idx) == cv::type::LUA_TFUNCTION;
@@ -1472,4 +1477,46 @@ int32_t lua::State::TypeError(int32_t idx, const std::string_view& tname)
     auto res = ArgError(idx, msg);
     PushString(std::move(msg));
     return res;
+}
+
+int32_t lua::State::FileResult(int stat, const char* fname)
+{
+    auto en = errno;
+    if (stat)
+    {
+        PushBoolean(true);
+        return 1;
+    }
+    PushNil();
+    auto msg = en ? strerror(en) : "(no extra info)";
+    PushString(fname ? std::format("{}: {}", fname, msg) : msg);
+    PushInteger(en);
+    return 3;
+}
+
+int32_t lua::State::ExecResult(int stat)
+{
+    if (stat && errno)
+    {
+        return FileResult(stat, nullptr);
+    }
+    auto what = "exit";
+#ifndef _WIN32
+    if (WIFEXITED(stat))
+    {
+        stat = WEXITSTATUS(stat);
+    }
+    else if (WIFSIGNALED(stat))
+    {
+        stat = WTERMSIG(stat);
+        what = "signal";
+    }
+#endif
+    if (*what == 'e' && !stat)
+        PushBoolean(true);
+    else
+        PushNil();
+    PushString(what);
+    PushInteger(stat);
+    return 3;
 }

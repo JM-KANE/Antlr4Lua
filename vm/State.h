@@ -311,6 +311,7 @@ struct State
     bool IsNone(int32_t idx);
     bool IsNoneOrNil(int32_t idx);
     bool IsFloat(int32_t idx);
+    bool IsBoolean(int32_t idx);
     bool IsFunction(int32_t idx) const;
     bool ToBoolean(int32_t idx);
     int64_t ToInteger(int32_t idx);
@@ -355,6 +356,9 @@ struct State
     void IntError(int32_t idx);
     void TagError(int32_t idx, uint8_t tag);
     int32_t TypeError(int32_t idx, const std::string_view& tname);
+
+    int32_t FileResult(int stat, const char* fname);
+    int32_t ExecResult(int stat);
 };
 
 }  // namespace lua
