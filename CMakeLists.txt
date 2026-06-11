@@ -5,9 +5,6 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 project(Antlr4Lua LANGUAGES CXX)
 
-# set(CMAKE_CXX_STANDARD 20)
-# set(ANTLR_PATH "/usr/local/lib/antlr-4.13.2-complete.jar" CACHE FILEPATH "path of antlr-*.jar")
-
 # option(debug "" OFF)
 # if(debug)
 #     set(CMAKE_BUILD_TYPE "Debug")
@@ -44,8 +41,6 @@ set_target_properties(lua PROPERTIES
 )
 
 # install
-
-
 set(LIB_INSTALL lua lua_shared)
 install(TARGETS ${LIB_INSTALL}
         RUNTIME DESTINATION bin

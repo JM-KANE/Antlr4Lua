@@ -1,3 +1,8 @@
+#ifdef _WIN32
+#define LUA_BUILD_AS_DLL
+#define LUA_LIB
+#endif
+
 #include <alua.hpp>
 
 static int32_t l_double(lua::State *L)
