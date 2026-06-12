@@ -355,7 +355,7 @@ void lua::VirtualMachine::CheckGC()
 void lua::VirtualMachine::SetSeed(seed_type seed)
 {
     gen.seed(seed);
-    gen();
+    auto res = gen();
 }
 
 rand_generator& lua::VirtualMachine::GetGen()

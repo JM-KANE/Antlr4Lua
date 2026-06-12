@@ -1,5 +1,7 @@
 #include "mathOp.h"
 #include "../State.h"
+#include <numbers>
+
 using namespace lua;
 
 namespace
