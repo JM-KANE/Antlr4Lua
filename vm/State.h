@@ -357,6 +357,7 @@ struct State
     void TagError(int32_t idx, uint8_t tag);
     int32_t TypeError(int32_t idx, const std::string_view& tname);
 
+    int32_t FileResult(const std::error_code& ec, const char* fname);
     int32_t FileResult(int stat, const char* fname);
     int32_t ExecResult(int stat);
 };

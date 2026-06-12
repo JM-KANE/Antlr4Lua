@@ -1479,6 +1479,24 @@ int32_t lua::State::TypeError(int32_t idx, const std::string_view& tname)
     return res;
 }
 
+int32_t lua::State::FileResult(const std::error_code& ec, const char* fname)
+{
+    auto code = ec.value();
+    if (!code)
+    {
+        PushBoolean(true);
+        return 1;
+    }
+    PushNil();
+    auto msg = ec.message();
+    if (fname)
+        PushString(std::format("{}: {}", fname, std::move(msg)));
+    else
+        PushString(std::move(msg));
+    PushInteger(code);
+    return 3;
+}
+
 int32_t lua::State::FileResult(int stat, const char* fname)
 {
     auto en = errno;

@@ -1,11 +1,12 @@
 #include "os.h"
 #include "../State.h"
 #include <chrono>
+#include <filesystem>
 
 using namespace lua;
 using namespace stdlib;
 namespace t = std::chrono;
-using namespace std::chrono_literals;            
+using namespace std::chrono_literals;
 
 namespace
 {
@@ -162,17 +163,42 @@ int32_t lua::stdlib::os::Getenv(State* ls)
 
 int32_t lua::stdlib::os::Remove(State* ls)
 {
-    return 0;
+    auto file = ls->CheckString(1);
+    std::error_code ec;
+    std::filesystem::remove(file, ec);
+    return ls->FileResult(ec, nullptr);
 }
 
 int32_t lua::stdlib::os::Rename(State* ls)
 {
-    return 0;
+    auto fromFile = ls->CheckString(1);
+    auto toFile = ls->CheckString(2);
+    std::error_code ec;
+    std::filesystem::rename(fromFile, toFile, ec);
+    return ls->FileResult(ec, nullptr);
 }
 
 int32_t lua::stdlib::os::Setlocale(State* ls)
 {
-    return 0;
+    bool nil = ls->IsNoneOrNil(1);
+    auto locale = nil ? "" : ls->CheckString(1);
+    int cat = LC_ALL;
+    if (!ls->IsNoneOrNil(2))
+    {
+        auto catName = ls->CheckString(2);
+        static const std::unordered_map<std::string_view, int> category{
+            {"all", LC_ALL},           {"collate", LC_COLLATE}, {"ctype", LC_CTYPE},
+            {"monetary", LC_MONETARY}, {"numeric", LC_NUMERIC}, {"time", LC_TIME}};
+        auto it = category.find(catName);
+        if (it == category.end())
+        {
+            std::string msg = "invalid option '" + catName + "'";
+            ls->ArgError(2, msg);
+        }
+        cat = it->second;
+    }
+    ls->PushString(std::setlocale(cat, nil ? nullptr : locale.c_str()));
+    return 1;
 }
 
 int32_t lua::stdlib::os::Time(State* ls)
