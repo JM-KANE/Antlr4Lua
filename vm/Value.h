@@ -2,7 +2,7 @@
 #define _VALUE_H
 
 // #include "../code_gen/FuncInfo.h"
-
+#include "stdlib/libtype.h"
 #include <variant>
 #include <memory>
 #include <vector>
@@ -16,12 +16,6 @@ struct State;
 struct Table;
 struct Closure;
 using BaseValue = std::variant<std::nullptr_t, bool, int64_t, double, std::string, Table*, Closure*, State*>;
-
-template <typename... Ts>
-using is_lua_number = std::conjunction<
-    std::disjunction<std::is_same<std::decay_t<Ts>, int64_t>, std::is_same<std::decay_t<Ts>, double>>...>;
-template <typename... Ts>
-static constexpr bool is_lua_number_v = is_lua_number<Ts...>::value;
 
 struct Value : public BaseValue
 {

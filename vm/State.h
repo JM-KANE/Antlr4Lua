@@ -102,6 +102,9 @@ struct State
     void Pop(size_t n);
     void PushGlobalTable();
 
+    template <typename OP, typename... I>
+    void PushTransform(OP op, I... idx);
+
     void GetConst(int32_t idx);
     void GetRK(int32_t idx);
     void LoadVararg(int32_t n);
@@ -311,6 +314,7 @@ struct State
     bool IsNone(int32_t idx);
     bool IsNoneOrNil(int32_t idx);
     bool IsFloat(int32_t idx);
+    bool IsPureInteger(int32_t idx) const;
     bool IsBoolean(int32_t idx);
     bool IsFunction(int32_t idx) const;
     bool ToBoolean(int32_t idx);
@@ -355,12 +359,35 @@ struct State
 
     void IntError(int32_t idx);
     void TagError(int32_t idx, uint8_t tag);
+    int32_t TypeArgError(int32_t idx, const std::string_view& tname, const std::string& typeArg);
     int32_t TypeError(int32_t idx, const std::string_view& tname);
+    int ArgToNumber(int32_t arg);
 
     int32_t FileResult(const std::error_code& ec, const char* fname);
     int32_t FileResult(int stat, const char* fname);
     int32_t ExecResult(int stat);
+
+    void SetSeed(seed_type seed);
+    double RandomDefault();
+    int64_t RandomRange(int64_t m, int64_t n);
 };
+
+template <typename OP, typename... I>
+inline void State::PushTransform(OP op, I... idx)
+{
+    std::visit(
+        [&](auto&&... arg)
+        {
+            auto res = op(std::forward<decltype(arg)>(arg)...);
+            using Decayed = std::decay_t<decltype(res)>;
+            constexpr std::size_t N = size_of_type<Decayed>;
+            if constexpr (N)
+                std::apply([&](auto&&... args) { (PushAny(std::move(args)), ...); }, std::move(res));
+            else
+                PushAny(std::move(res));
+        },
+        stack().Get(idx)...);
+}
 
 }  // namespace lua
 #endif

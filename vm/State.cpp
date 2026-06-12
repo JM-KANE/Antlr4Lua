@@ -138,11 +138,10 @@ void lua::State::SetEnv(int32_t idx)
 
 void lua::State::OpenLibs()
 {
-    constexpr FuncReg<8> A{
+    constexpr FuncReg<9> A{
         Reg{"_G", stdlib::OpenBaseLib},      {"math", stdlib::OpenMathLib},           {"table", stdlib::OpenTableLib},
         {"string", stdlib::OpenStringLib},   {"utf8", stdlib::OpenUTF8Lib},           {"os", stdlib::OpenOSLib},
-        {"package", stdlib::OpenPackageLib}, {"coroutine", stdlib::OpenCoroutineLib},
-    };
+        {"package", stdlib::OpenPackageLib}, {"coroutine", stdlib::OpenCoroutineLib}, {"io", stdlib::OpenIOLib}};
 
     for (auto&& [name, f] : A)
     {
@@ -945,6 +944,12 @@ bool lua::State::IsFloat(int32_t idx)
     return ToFloatX(idx).second;
 }
 
+bool lua::State::IsPureInteger(int32_t idx) const
+{
+    auto val = stack().Get(idx);
+    return val.index() == 2;
+}
+
 bool lua::State::IsBoolean(int32_t idx)
 {
     return Type(idx) == cv::type::LUA_TBOOLEAN;
@@ -1024,7 +1029,8 @@ std::pair<std::string, bool> lua::State::ToStringX(int32_t idx)
                 std::ostringstream os;
                 os << std::setprecision(15) << arg;
                 auto s = os.str();
-                if (std::find_if(s.begin(), s.end(), [](char c) { return c == '.' || c == 'e'; }) == s.end())
+                if (!std::isnan(arg) && !std::isinf(arg)
+                    && std::find_if(s.begin(), s.end(), [](char c) { return c == '.' || c == 'e'; }) == s.end())
                 {
                     s += ".0";
                 }
@@ -1458,6 +1464,14 @@ void lua::State::TagError(int32_t idx, uint8_t tag)
     TypeError(idx, TypeName(tag));
 }
 
+int32_t lua::State::TypeArgError(int32_t idx, const std::string_view& tname, const std::string& typeArg)
+{
+    auto msg = std::string(tname) + (" expected, got " + typeArg);
+    auto res = ArgError(idx, msg);
+    PushString(std::move(msg));
+    return res;
+}
+
 int32_t lua::State::TypeError(int32_t idx, const std::string_view& tname)
 {
     std::string typeArg;
@@ -1473,10 +1487,20 @@ int32_t lua::State::TypeError(int32_t idx, const std::string_view& tname)
     {
         typeArg = TypeName2(idx);
     }
-    auto msg = std::string(tname) + (" expected, got " + typeArg);
-    auto res = ArgError(idx, msg);
-    PushString(std::move(msg));
-    return res;
+    return TypeArgError(idx, tname, typeArg);
+}
+
+int lua::State::ArgToNumber(int32_t arg)
+{
+    auto val = stack().Get(arg);
+    auto num = val.ConvertToNumber();
+    if (num.IsNil())
+    {
+        TypeError(arg, "number");
+        return 1;
+    }
+    stack().Set(arg, std::move(num));
+    return 0;
 }
 
 int32_t lua::State::FileResult(const std::error_code& ec, const char* fname)
@@ -1537,4 +1561,23 @@ int32_t lua::State::ExecResult(int stat)
     PushString(what);
     PushInteger(stat);
     return 3;
+}
+
+void lua::State::SetSeed(seed_type seed)
+{
+    vm->SetSeed(seed);
+}
+
+double lua::State::RandomDefault()
+{
+    auto& g = vm->GetGen();
+    static std::uniform_real_distribution range(0., 1.);
+    return range(g);
+}
+
+int64_t lua::State::RandomRange(int64_t m, int64_t n)
+{
+    auto& g = vm->GetGen();
+    static std::uniform_int_distribution<int64_t> range(m, n);
+    return range(g);
 }

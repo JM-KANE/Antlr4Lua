@@ -351,3 +351,14 @@ void lua::VirtualMachine::CheckGC()
 {
     gc.CheckGC();
 }
+
+void lua::VirtualMachine::SetSeed(seed_type seed)
+{
+    gen.seed(seed);
+    gen();
+}
+
+rand_generator& lua::VirtualMachine::GetGen()
+{
+    return gen;
+}

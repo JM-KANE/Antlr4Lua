@@ -1,5 +1,5 @@
-#ifndef _MATHOP_H
-#define _MATHOP_H
+#ifndef IO_H
+#define IO_H
 #include "libtype.h"
 
 namespace lua
@@ -9,9 +9,13 @@ struct State;
 namespace stdlib
 {
 
-int32_t OpenMathLib(State* ls);
+int32_t OpenIOLib(State* ls);
+
+namespace io
+{
+}  // namespace io
+
 }  // namespace stdlib
 
 }  // namespace lua
-
 #endif

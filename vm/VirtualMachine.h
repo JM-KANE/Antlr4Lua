@@ -137,8 +137,7 @@ private:
     Table registry;
     Table global;  ///< env of main
     std::unique_ptr<Table> args;
-
-    // TODO randomseed
+    rand_generator gen = rand_generator(std::random_device{}());  // TODO user data
 
     /* main */
     State main;
@@ -166,6 +165,10 @@ public:
 
     void CollectGarbage();
     void CheckGC();
+
+    void SetSeed(seed_type seed);
+
+    rand_generator& GetGen();
 };
 }  // namespace lua
 
