@@ -960,6 +960,11 @@ bool lua::State::IsFunction(int32_t idx) const
     return Type(idx) == cv::type::LUA_TFUNCTION;
 }
 
+bool lua::State::IsTable(int32_t idx) const
+{
+    return Type(idx) == cv::type::LUA_TTABLE;
+}
+
 bool lua::State::ToBoolean(int32_t idx)
 {
     return stack().Get(idx).ConvertToBoolean();

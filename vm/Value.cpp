@@ -110,7 +110,7 @@ Table* lua::Value::GetMetatable(State* ls) const
     auto key = "_MT" + std::to_string(TypeOf());
     if (auto mt = ls->registry.Get(key); mt && (*mt)->IsTable())
     {
-        return std::get<Table*>(**mt)->metatable;
+        return std::get<Table*>(**mt);
     }
     return nullptr;
 }

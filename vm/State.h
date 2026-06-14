@@ -317,6 +317,7 @@ struct State
     bool IsPureInteger(int32_t idx) const;
     bool IsBoolean(int32_t idx);
     bool IsFunction(int32_t idx) const;
+    bool IsTable(int32_t idx) const;
     bool ToBoolean(int32_t idx);
     int64_t ToInteger(int32_t idx);
     std::pair<int64_t, bool> ToIntegerX(int32_t idx);

@@ -312,6 +312,8 @@ int32_t Type(State* ls)
 
 using namespace stdlib;
 
+namespace
+{
 constexpr FuncReg<27> mathFuncs{
     Reg{"random", math::Random}, {"randomseed", math::RandomSeed},
     {"max", math::Max},          {"min", math::Min},
@@ -329,6 +331,8 @@ constexpr FuncReg<27> mathFuncs{
     {"mininteger", nullptr},
 };
 
+}  // namespace
+
 int32_t lua::stdlib::OpenMathLib(State* ls)
 {
     ls->NewLib(mathFuncs);
@@ -336,9 +340,9 @@ int32_t lua::stdlib::OpenMathLib(State* ls)
     ls->SetField(-2, "pi");
     ls->PushNumber(std::numeric_limits<double>::infinity());
     ls->SetField(-2, "huge");
-    ls->PushInteger(std::numeric_limits<int64_t>::max());
+    ls->PushInteger(cv::LUA_MAXINTEGER);
     ls->SetField(-2, "maxinteger");
-    ls->PushInteger(std::numeric_limits<int64_t>::min());
+    ls->PushInteger(cv::LUA_MININTEGER);
     ls->SetField(-2, "mininteger");
     return 1;
 }

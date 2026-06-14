@@ -2,6 +2,8 @@
 #define CONSTANT_H
 
 #include <stdint.h>
+#include <limits>
+
 namespace lua
 {
 
@@ -14,6 +16,9 @@ constexpr auto LFIELDS_PER_FLUSH = 50;
 constexpr auto LUA_MINSTACK = 20;
 constexpr auto LUAI_MAXSTACK = 1'000'000;
 constexpr auto LUA_REGISTRYINDEX = -LUAI_MAXSTACK - 1000;
+
+constexpr auto LUA_MAXINTEGER = std::numeric_limits<int64_t>::max();
+constexpr auto LUA_MININTEGER = std::numeric_limits<int64_t>::min();
 
 constexpr auto LuaUpvalueIndex(int32_t i)
 {

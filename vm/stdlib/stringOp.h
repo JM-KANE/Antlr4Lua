@@ -10,10 +10,6 @@ namespace stdlib
 {
 
 int32_t OpenStringLib(State* ls);
-namespace stringOp
-{
-
-}  // namespace stringOp
 
 }  // namespace stdlib
 
